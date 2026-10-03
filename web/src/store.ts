@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { totalSpentSec } from './dates'
+import { runningSec, totalSpentSec } from './dates'
 import { supabase } from './supabase'
-import type { NewTask, Patch, Priority, Task } from './types'
-
-const LOCAL_KEY = 'planner.tasks.v1'
+import type { NewTask, Patch, Priority, Task, TimeEntry } from './types'
 
 interface Row {
   id: string
@@ -19,6 +17,16 @@ interface Row {
   spent_sec: number
   timer_started_at: string | null
   created_at: string
+}
+
+interface EntryRow {
+  id: string
+  task_id: string | null
+  task_title: string
+  tags: string[] | null
+  started_at: string
+  ended_at: string
+  seconds: number
 }
 
 const fromRow = (r: Row): Task => ({
@@ -37,6 +45,16 @@ const fromRow = (r: Row): Task => ({
   createdAt: r.created_at,
 })
 
+const entryFromRow = (r: EntryRow): TimeEntry => ({
+  id: r.id,
+  taskId: r.task_id,
+  title: r.task_title,
+  tags: r.tags ?? [],
+  startedAt: r.started_at,
+  endedAt: r.ended_at,
+  seconds: r.seconds,
+})
+
 function toRow(p: Patch): Record<string, unknown> {
   const row: Record<string, unknown> = {}
   if (p.title !== undefined) row.title = p.title
@@ -53,63 +71,31 @@ function toRow(p: Patch): Record<string, unknown> {
   return row
 }
 
-let importing: Promise<void> | null = null
-
-/** Переносит задачи, созданные до входа (хранились в браузере), в облако. */
-function importLocal(): Promise<void> {
-  // повторный вызов (например, двойной запуск эффекта в StrictMode) ждёт первый
-  importing ??= doImport().finally(() => {
-    importing = null
-  })
-  return importing
-}
-
-async function doImport(): Promise<void> {
-  let raw: string | null = null
-  try {
-    raw = localStorage.getItem(LOCAL_KEY)
-    const local = raw ? (JSON.parse(raw) as { title: string; notes: string; dueAt: string | null; done: boolean; createdAt: string }[]) : []
-    if (local.length === 0) return
-    // очищаем до отправки, чтобы параллельный запуск не создал дубли
-    localStorage.removeItem(LOCAL_KEY)
-    const { error } = await supabase.from('tasks').insert(
-      local.map((t) => ({
-        title: t.title,
-        notes: t.notes,
-        due_at: t.dueAt,
-        done: t.done,
-        created_at: t.createdAt,
-      })),
-    )
-    if (error && raw) localStorage.setItem(LOCAL_KEY, raw)
-  } catch {
-    // нет доступа к localStorage или битые данные — просто пропускаем
-  }
-}
-
-/** Задачи текущего пользователя в Supabase (доступ ограничен правилами RLS). */
+/** Задачи и журнал времени текущего пользователя (доступ ограничен правилами RLS). */
 export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([])
+  const [entries, setEntries] = useState<TimeEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (error) {
-      setError(error.message)
+    const [t, e] = await Promise.all([
+      supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+      supabase.from('time_entries').select('*').order('started_at', { ascending: false }),
+    ])
+    const failure = t.error ?? e.error
+    if (failure) {
+      setError(failure.message)
       return
     }
-    setTasks((data as Row[]).map(fromRow))
+    setTasks((t.data as Row[]).map(fromRow))
+    setEntries((e.data as EntryRow[]).map(entryFromRow))
     setError(null)
   }, [])
 
   useEffect(() => {
     let active = true
     void (async () => {
-      await importLocal()
       await refresh()
       if (active) setLoading(false)
     })()
@@ -122,7 +108,7 @@ export function useTasks() {
     }
   }, [refresh])
 
-  const add = useCallback(async (t: NewTask) => {
+  const add = useCallback(async (t: NewTask): Promise<Task | undefined> => {
     const { data, error } = await supabase
       .from('tasks')
       .insert({
@@ -136,8 +122,13 @@ export function useTasks() {
       })
       .select()
       .single()
-    if (error) return setError(error.message)
-    setTasks((prev) => [fromRow(data as Row), ...prev])
+    if (error) {
+      setError(error.message)
+      return undefined
+    }
+    const task = fromRow(data as Row)
+    setTasks((prev) => [task, ...prev])
+    return task
   }, [])
 
   const patch = useCallback(
@@ -164,42 +155,88 @@ export function useTasks() {
     [refresh],
   )
 
-  const toggle = useCallback(
-    (id: string) => {
-      const t = tasks.find((x) => x.id === id)
-      if (!t) return
-      const done = !t.done
-      const p: Patch = { done, doneAt: done ? new Date().toISOString() : null }
-      if (done && t.timerStartedAt) {
-        p.spentSec = totalSpentSec(t, Date.now())
-        p.timerStartedAt = null
-      }
-      void patch(id, p)
+  /** Записывает завершённый запуск таймера в журнал времени. */
+  const recordEntry = useCallback(async (t: Task, endMs: number) => {
+    const seconds = runningSec(t, endMs)
+    if (!t.timerStartedAt || seconds < 1) return
+    const { data, error } = await supabase
+      .from('time_entries')
+      .insert({
+        task_id: t.id,
+        task_title: t.title,
+        tags: t.tags,
+        started_at: t.timerStartedAt,
+        ended_at: new Date(endMs).toISOString(),
+        seconds,
+      })
+      .select()
+      .single()
+    if (error) return setError(error.message)
+    setEntries((prev) => [entryFromRow(data as EntryRow), ...prev])
+  }, [])
+
+  /** Останавливает таймер: пишет запуск в журнал и копит время в задаче. */
+  const stopTimer = useCallback(
+    (t: Task, extra: Patch = {}) => {
+      const nowMs = Date.now()
+      void recordEntry(t, nowMs)
+      void patch(t.id, { spentSec: totalSpentSec(t, nowMs), timerStartedAt: null, ...extra })
     },
-    [tasks, patch],
+    [recordEntry, patch],
   )
 
   const pauseTimer = useCallback(
     (id: string) => {
       const t = tasks.find((x) => x.id === id)
-      if (!t?.timerStartedAt) return
-      void patch(id, { spentSec: totalSpentSec(t, Date.now()), timerStartedAt: null })
+      if (t?.timerStartedAt) stopTimer(t)
     },
-    [tasks, patch],
+    [tasks, stopTimer],
+  )
+
+  /** Остановить таймер (если идёт) и отметить задачу выполненной. */
+  const finishTask = useCallback(
+    (id: string) => {
+      const t = tasks.find((x) => x.id === id)
+      if (!t) return
+      const done = { done: true, doneAt: new Date().toISOString() }
+      if (t.timerStartedAt) stopTimer(t, done)
+      else void patch(id, done)
+    },
+    [tasks, stopTimer, patch],
+  )
+
+  const toggle = useCallback(
+    (id: string) => {
+      const t = tasks.find((x) => x.id === id)
+      if (!t) return
+      if (t.done) void patch(id, { done: false, doneAt: null })
+      else finishTask(id)
+    },
+    [tasks, patch, finishTask],
   )
 
   /** Запускает таймер; идущий на другой задаче ставит на паузу. */
   const startTimer = useCallback(
     (id: string) => {
       for (const t of tasks) {
-        if (t.timerStartedAt && t.id !== id) {
-          void patch(t.id, { spentSec: totalSpentSec(t, Date.now()), timerStartedAt: null })
-        }
+        if (t.timerStartedAt && t.id !== id) stopTimer(t)
       }
       void patch(id, { timerStartedAt: new Date().toISOString() })
     },
-    [tasks, patch],
+    [tasks, stopTimer, patch],
   )
 
-  return { tasks, loading, error, add, patch, remove, toggle, startTimer, pauseTimer }
+  return {
+    tasks,
+    entries,
+    loading,
+    error,
+    add,
+    patch,
+    remove,
+    toggle,
+    finishTask,
+    startTimer,
+    pauseTimer,
+  }
 }

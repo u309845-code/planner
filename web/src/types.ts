@@ -32,3 +32,14 @@ export interface NewTask {
 }
 
 export type Patch = Partial<Omit<Task, 'id' | 'createdAt'>>
+
+/** Один запуск таймера. Название и теги скопированы из задачи на момент записи. */
+export interface TimeEntry {
+  id: string
+  taskId: string | null
+  title: string
+  tags: string[]
+  startedAt: string
+  endedAt: string
+  seconds: number
+}

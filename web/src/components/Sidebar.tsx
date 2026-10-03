@@ -3,21 +3,22 @@ import {
   CheckCheck,
   Clock,
   Flame,
-  Inbox,
   LogOut,
   Moon,
   StickyNote,
   Sun,
+  Timer,
+  Zap,
   type LucideIcon,
 } from 'lucide-react'
 import { TAGS } from '../tags'
 
-export type View = 'today' | 'hot' | 'soon' | 'inbox' | 'notes' | 'done'
+export type View = 'today' | 'hot' | 'soon' | 'quick' | 'notes' | 'time' | 'done'
 
 interface Props {
   view: View
   onView: (v: View) => void
-  counts: { hot: number; soon: number; inbox: number }
+  counts: { hot: number; soon: number; quick: number }
   tagFilter: string[]
   onTag: (id: string) => void
   email: string
@@ -26,19 +27,20 @@ interface Props {
   onSignOut: () => void
 }
 
-const ITEMS: { id: View; label: string; icon: LucideIcon; count?: 'hot' | 'soon' | 'inbox' }[] = [
+const ITEMS: { id: View; label: string; icon: LucideIcon; count?: 'hot' | 'soon' | 'quick' }[] = [
   { id: 'today', label: 'Сегодня', icon: CalendarCheck },
   { id: 'hot', label: 'Горит', icon: Flame, count: 'hot' },
   { id: 'soon', label: 'Скоро', icon: Clock, count: 'soon' },
-  { id: 'inbox', label: 'Входящие', icon: Inbox, count: 'inbox' },
+  { id: 'quick', label: 'Быстрые задачи', icon: Zap, count: 'quick' },
   { id: 'notes', label: 'Заметки', icon: StickyNote },
+  { id: 'time', label: 'Время', icon: Timer },
   { id: 'done', label: 'Выполнено', icon: CheckCheck },
 ]
 
 const BADGE = {
   hot: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
   soon: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
-  inbox: 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+  quick: 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
 } as const
 
 export default function Sidebar({

@@ -1,5 +1,5 @@
-import { Check, Flag, Pause, Play } from 'lucide-react'
-import { bucketOf, formatDue, formatMinutes, totalSpentSec } from '../dates'
+import { Check, Flag, Pause, Play, Timer } from 'lucide-react'
+import { bucketOf, formatDue, formatMinutes, formatSpent, totalSpentSec } from '../dates'
 import { tagById } from '../tags'
 import type { Task } from '../types'
 
@@ -23,7 +23,7 @@ export default function TaskRow({ task, now, onToggle, onEdit, onStart, onPause 
   const isTask = task.kind === 'task'
   const bucket = bucketOf(task, now)
   const running = task.timerStartedAt !== null
-  const spentMin = Math.floor(totalSpentSec(task, now) / 60)
+  const spentSec = totalSpentSec(task, now)
   const overdue = task.dueAt !== null && !task.done && new Date(task.dueAt).getTime() < now
 
   return (
@@ -75,10 +75,12 @@ export default function TaskRow({ task, now, onToggle, onEdit, onStart, onPause 
               {formatDue(task.dueAt, now)}
             </span>
           )}
-          {isTask && (task.plannedMin !== null || spentMin > 0) && (
-            <span className="text-slate-500">
-              {spentMin > 0 ? formatMinutes(spentMin) : '0 мин'}
-              {task.plannedMin !== null ? ` / ${formatMinutes(task.plannedMin)}` : ''}
+          {isTask && (task.plannedMin !== null || spentSec > 0) && (
+            <span className="inline-flex items-center gap-1 text-slate-500">
+              <Timer size={12} />
+              {spentSec > 0
+                ? `затрачено ${formatSpent(spentSec)}${task.plannedMin !== null ? ` из ${formatMinutes(task.plannedMin)}` : ''}`
+                : `план ${formatMinutes(task.plannedMin ?? 0)}`}
             </span>
           )}
         </div>

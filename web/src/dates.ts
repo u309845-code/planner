@@ -60,6 +60,26 @@ export function formatMinutes(min: number): string {
   return `${m} мин`
 }
 
+/** Затраченное время: «<1 мин», «25 мин», «1 ч 20 мин» */
+export function formatSpent(sec: number): string {
+  if (sec <= 0) return '0 мин'
+  if (sec < 60) return '<1 мин'
+  return formatMinutes(Math.floor(sec / 60))
+}
+
+export function formatDayLabel(dayMs: number, now: number): string {
+  const d = new Date(dayMs)
+  const t = new Date(now)
+  const days = Math.round(
+    (new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime() -
+      new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) /
+      DAY,
+  )
+  if (days === 0) return 'Сегодня'
+  if (days === 1) return 'Вчера'
+  return d.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' })
+}
+
 export function formatClock(sec: number): string {
   const s = Math.max(0, Math.floor(sec))
   const pad = (n: number) => String(n).padStart(2, '0')
