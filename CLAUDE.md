@@ -10,7 +10,7 @@ Node.js 24 + TypeScript, grammY (long polling), встроенный `node:sqlit
 - `npm run typecheck` — проверка типов
 
 ## Структура
-- `src/bot.ts` — команды, кнопки, цикл напоминаний (раз в 30 с)
+- `src/bot.ts` — команды, кнопки, цикл напоминаний (раз в 10 с)
 - `src/db.ts` — SQLite (`planner.db`), задачи и настройки
 - `src/parse.ts` — разбор «текст + когда» и форматирование времени
 

@@ -122,7 +122,7 @@ async function sendDue() {
   }
 }
 
-setInterval(sendDue, 30_000);
+setInterval(sendDue, 10_000);
 
 bot.catch((err) => console.error("Ошибка бота:", err.error));
 bot.start({ onStart: (me) => console.log(`Бот @${me.username} запущен`) });

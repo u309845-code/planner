@@ -19,6 +19,7 @@ export function parseTask(text: string, tz: string): Parsed {
 
   const title = (text.slice(0, hit.index) + text.slice(hit.index + hit.text.length))
     .replace(/\s+/g, " ")
+    .replace(/[\s.,;:\-–—]+$/, "")
     .trim();
   return {
     title: title || text.trim(),
