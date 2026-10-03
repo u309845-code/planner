@@ -107,7 +107,7 @@ export default function WeekView({ tasks, now, onPlan, onEdit, onToggle, onCreat
             Эта неделя
           </button>
         )}
-        <p className="ml-auto flex items-center gap-3 text-xs text-slate-500">
+        <p className="ml-auto flex shrink-0 items-center gap-3 text-xs text-slate-500">
           <span className="flex items-center gap-1">
             <span className="size-2.5 rounded-sm bg-red-400" /> горит
           </span>
@@ -117,10 +117,7 @@ export default function WeekView({ tasks, now, onPlan, onEdit, onToggle, onCreat
         </p>
       </div>
 
-      <div
-        className="grid gap-2 overflow-x-auto pb-1"
-        style={{ gridTemplateColumns: 'repeat(5, minmax(150px, 1.2fr)) repeat(2, minmax(120px, 0.8fr))' }}
-      >
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         {days.map((d) => {
           const key = toDateKey(d)
           const isToday = key === todayKey
@@ -136,21 +133,28 @@ export default function WeekView({ tasks, now, onPlan, onEdit, onToggle, onCreat
             <section
               key={key}
               {...dropProps(key)}
-              className={`flex min-h-56 flex-col rounded-2xl p-2 ring-1 transition ${
+              className={`flex min-h-48 min-w-0 flex-col rounded-2xl p-2 ring-1 transition ${
                 isOver
                   ? 'bg-indigo-50 ring-2 ring-indigo-400 dark:bg-indigo-950/40'
                   : isToday
-                    ? 'bg-white ring-indigo-300 dark:bg-slate-900 dark:ring-indigo-700'
-                    : 'bg-slate-100/60 ring-slate-200 dark:bg-slate-900/50 dark:ring-slate-800'
+                    ? 'bg-white ring-2 ring-indigo-300 dark:bg-slate-900 dark:ring-indigo-700'
+                    : 'bg-white/60 ring-slate-200 dark:bg-slate-900/40 dark:ring-slate-800'
               }`}
             >
-              <header className="mb-2 flex items-center gap-1 px-1">
-                <div className="min-w-0 flex-1">
-                  <p className={`text-sm font-medium capitalize ${isToday ? 'text-indigo-600 dark:text-indigo-400' : ''}`}>
-                    {fmt(d, { weekday: 'short' })}, {new Date(d).getDate()}
+              <header className="mb-2 flex items-center gap-2 px-1">
+                <span
+                  className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+                    isToday ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-200'
+                  }`}
+                >
+                  {new Date(d).getDate()}
+                </span>
+                <div className="min-w-0 flex-1 leading-tight">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    {fmt(d, { weekday: 'short' })}
                   </p>
                   {planMin > 0 && (
-                    <p className="text-xs text-slate-500">≈ {formatMinutes(planMin)}</p>
+                    <p className="truncate text-xs text-slate-400">≈ {formatMinutes(planMin)}</p>
                   )}
                 </div>
                 <button
@@ -171,8 +175,10 @@ export default function WeekView({ tasks, now, onPlan, onEdit, onToggle, onCreat
                     title="Дедлайн в этот день (задача запланирована на другой)"
                   >
                     <Flag size={11} className="shrink-0" />
-                    <span className="truncate">{t.title}</span>
-                    <span className="ml-auto shrink-0 opacity-70">{t.dueAt && formatDue(t.dueAt, now).split(' ').pop()}</span>
+                    <span className="min-w-0 flex-1 truncate">{t.title}</span>
+                    <span className="shrink-0 whitespace-nowrap opacity-70">
+                      {t.dueAt && formatDue(t.dueAt, now).split(' ').pop()}
+                    </span>
                   </button>
                 ))}
                 {planned.map(card)}
