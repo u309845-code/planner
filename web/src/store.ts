@@ -23,11 +23,24 @@ const fromRow = (r: Row): Task => ({
 })
 
 /** Переносит задачи, созданные до входа (хранились в браузере), в облако. */
-async function importLocal(): Promise<void> {
+let importing: Promise<void> | null = null
+
+function importLocal(): Promise<void> {
+  // повторный вызов (например, двойной запуск эффекта в StrictMode) ждёт первый
+  importing ??= doImport().finally(() => {
+    importing = null
+  })
+  return importing
+}
+
+async function doImport(): Promise<void> {
+  let raw: string | null = null
   try {
-    const raw = localStorage.getItem(LOCAL_KEY)
+    raw = localStorage.getItem(LOCAL_KEY)
     const local = raw ? (JSON.parse(raw) as Task[]) : []
     if (local.length === 0) return
+    // очищаем до отправки, чтобы параллельный запуск не создал дубли
+    localStorage.removeItem(LOCAL_KEY)
     const { error } = await supabase.from('tasks').insert(
       local.map((t) => ({
         title: t.title,
@@ -37,7 +50,7 @@ async function importLocal(): Promise<void> {
         created_at: t.createdAt,
       })),
     )
-    if (!error) localStorage.removeItem(LOCAL_KEY)
+    if (error && raw) localStorage.setItem(LOCAL_KEY, raw)
   } catch {
     // нет доступа к localStorage или битые данные — просто пропускаем
   }
