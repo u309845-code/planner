@@ -8,6 +8,7 @@ interface Row {
   title: string
   notes: string
   due_at: string | null
+  plan_date: string | null
   done: boolean
   done_at: string | null
   kind: 'task' | 'note'
@@ -34,6 +35,7 @@ const fromRow = (r: Row): Task => ({
   title: r.title,
   notes: r.notes,
   dueAt: r.due_at,
+  planDate: r.plan_date,
   done: r.done,
   doneAt: r.done_at,
   kind: r.kind,
@@ -60,6 +62,7 @@ function toRow(p: Patch): Record<string, unknown> {
   if (p.title !== undefined) row.title = p.title
   if (p.notes !== undefined) row.notes = p.notes
   if (p.dueAt !== undefined) row.due_at = p.dueAt
+  if (p.planDate !== undefined) row.plan_date = p.planDate
   if (p.done !== undefined) row.done = p.done
   if (p.doneAt !== undefined) row.done_at = p.doneAt
   if (p.kind !== undefined) row.kind = p.kind
@@ -115,6 +118,7 @@ export function useTasks() {
         title: t.title,
         notes: t.notes ?? '',
         due_at: t.dueAt ?? null,
+        plan_date: t.planDate ?? null,
         kind: t.kind ?? 'task',
         tags: t.tags ?? [],
         priority: t.priority ?? 0,

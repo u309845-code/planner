@@ -1,5 +1,12 @@
-import { Check, Flag, Pause, Play, Timer } from 'lucide-react'
-import { bucketOf, formatDue, formatMinutes, formatSpent, totalSpentSec } from '../dates'
+import { CalendarDays, Check, Flag, Pause, Play, Timer } from 'lucide-react'
+import {
+  bucketOf,
+  formatDue,
+  formatMinutes,
+  formatSpent,
+  fromDateKey,
+  totalSpentSec,
+} from '../dates'
 import { tagById } from '../tags'
 import type { Task } from '../types'
 
@@ -73,6 +80,16 @@ export default function TaskRow({ task, now, onToggle, onEdit, onStart, onPause 
             <span className={`rounded-md px-2 py-0.5 ${DUE_STYLE[bucket === 'none' ? 'later' : bucket]}`}>
               {overdue ? 'просрочено · ' : ''}
               {formatDue(task.dueAt, now)}
+            </span>
+          )}
+          {isTask && task.planDate && !task.done && (
+            <span className="inline-flex items-center gap-1 text-slate-500">
+              <CalendarDays size={12} />
+              {new Date(fromDateKey(task.planDate)).toLocaleDateString('ru-RU', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+              })}
             </span>
           )}
           {isTask && (task.plannedMin !== null || spentSec > 0) && (

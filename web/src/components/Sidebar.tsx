@@ -1,6 +1,7 @@
 import {
   BarChart3,
   CalendarCheck,
+  CalendarRange,
   CheckCheck,
   Clock,
   Flame,
@@ -14,7 +15,7 @@ import {
 } from 'lucide-react'
 import { TAGS } from '../tags'
 
-export type View = 'today' | 'hot' | 'soon' | 'quick' | 'notes' | 'time' | 'reports' | 'done'
+export type View = 'today' | 'week' | 'hot' | 'soon' | 'quick' | 'notes' | 'time' | 'reports' | 'done'
 
 interface Props {
   view: View
@@ -30,6 +31,7 @@ interface Props {
 
 const ITEMS: { id: View; label: string; icon: LucideIcon; count?: 'hot' | 'soon' | 'quick' }[] = [
   { id: 'today', label: 'Сегодня', icon: CalendarCheck },
+  { id: 'week', label: 'Неделя', icon: CalendarRange },
   { id: 'hot', label: 'Горит', icon: Flame, count: 'hot' },
   { id: 'soon', label: 'Скоро', icon: Clock, count: 'soon' },
   { id: 'quick', label: 'Быстрые задачи', icon: Zap, count: 'quick' },

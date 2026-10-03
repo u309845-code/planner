@@ -7,6 +7,8 @@ export interface Task {
   notes: string
   /** Дедлайн: ISO-строка в UTC или null */
   dueAt: string | null
+  /** День в плане: локальная дата «ГГГГ-ММ-ДД» или null (отдельно от дедлайна) */
+  planDate: string | null
   done: boolean
   doneAt: string | null
   kind: Kind
@@ -25,6 +27,7 @@ export interface NewTask {
   title: string
   notes?: string
   dueAt?: string | null
+  planDate?: string | null
   kind?: Kind
   tags?: string[]
   priority?: Priority

@@ -95,6 +95,27 @@ export function runningSec(t: Task, now: number): number {
 
 export const totalSpentSec = (t: Task, now: number): number => t.spentSec + runningSec(t, now)
 
+/** Локальная дата «ГГГГ-ММ-ДД» (для поля «день в плане») */
+export function toDateKey(ms: number): string {
+  const d = new Date(ms)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/** «ГГГГ-ММ-ДД» → полночь этого дня по местному времени */
+export function fromDateKey(key: string): number {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d).getTime()
+}
+
+/** Понедельник недели, в которую попадает `ms` (полночь) */
+export function weekStart(ms: number): number {
+  const d = new Date(ms)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d.getTime()
+}
+
 /** ISO (UTC) → значение для <input type="datetime-local"> */
 export function isoToLocalInput(iso: string | null): string {
   if (!iso) return ''

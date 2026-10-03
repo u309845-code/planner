@@ -8,8 +8,10 @@ import Sidebar, { type View } from './components/Sidebar'
 import TaskDialog, { type TaskForm } from './components/TaskDialog'
 import TaskRow from './components/TaskRow'
 import TimeView from './components/TimeView'
+import TimerBar from './components/TimerBar'
 import TimerPanel from './components/TimerPanel'
-import { bucketOf, byDue, endOfDay, formatDue, formatSpent, isSameDay } from './dates'
+import WeekView from './components/WeekView'
+import { bucketOf, byDue, endOfDay, formatDue, formatSpent, isSameDay, toDateKey } from './dates'
 import { useNow, useTheme } from './hooks'
 import { dayBreakdown, taskDays } from './stats'
 import { supabase } from './supabase'
@@ -33,6 +35,7 @@ export default function App() {
 
 const TITLES: Record<View, string> = {
   today: 'Фокус на сегодня',
+  week: 'Неделя',
   hot: 'Горит',
   soon: 'Скоро',
   quick: 'Быстрые задачи',
@@ -87,11 +90,13 @@ function Planner({ email }: { email: string }) {
 
   const [view, setView] = useState<View>('today')
   const [tagFilter, setTagFilter] = useState<string[]>([])
-  // 'new' — форма новой задачи, иначе id редактируемой задачи
+  // id редактируемой задачи
   const [dialog, setDialog] = useState<string | null>(null)
+  // не null — открыта форма новой задачи с этими значениями по умолчанию
+  const [creating, setCreating] = useState<Partial<TaskForm> | null>(null)
   const [quickText, setQuickText] = useState('')
 
-  const editing = dialog && dialog !== 'new' ? tasks.find((t) => t.id === dialog) : undefined
+  const editing = dialog ? tasks.find((t) => t.id === dialog) : undefined
 
   const data = useMemo(() => {
     const matches = (t: Task) => tagFilter.every((g) => t.tags.includes(g))
@@ -99,21 +104,29 @@ function Planner({ email }: { email: string }) {
     const counts = {
       hot: allOpen.filter((t) => bucketOf(t, now) === 'hot').length,
       soon: allOpen.filter((t) => bucketOf(t, now) === 'soon').length,
-      quick: allOpen.filter((t) => !t.dueAt).length,
+      quick: allOpen.filter((t) => !t.dueAt && !t.planDate).length,
     }
     const open = allOpen.filter(matches)
     const end = endOfDay(now)
+    const todayKey = toDateKey(now)
     const todayDone = tasks.filter(
       (t) => t.kind === 'task' && t.done && t.doneAt && isSameDay(t.doneAt, now) && matches(t),
     )
-    const todayOpen = open.filter((t) => t.dueAt && new Date(t.dueAt).getTime() <= end).sort(byDue)
+    // на сегодня: срок сегодня или раньше, либо день в плане сегодня или раньше
+    const todayOpen = open
+      .filter(
+        (t) =>
+          (t.dueAt && new Date(t.dueAt).getTime() <= end) || (t.planDate && t.planDate <= todayKey),
+      )
+      .sort(byDue)
     return {
       counts,
+      week: tasks.filter((t) => t.kind === 'task' && matches(t)),
       hot: open.filter((t) => bucketOf(t, now) === 'hot').sort(byDue),
       soon: open.filter((t) => bucketOf(t, now) === 'soon').sort(byDue),
       today: [...todayOpen, ...todayDone],
       todayDone: todayDone.length,
-      quick: open.filter((t) => !t.dueAt),
+      quick: open.filter((t) => !t.dueAt && !t.planDate),
       notes: tasks.filter((t) => t.kind === 'note'),
       done: tasks
         .filter((t) => t.kind === 'task' && t.done && matches(t))
@@ -147,7 +160,13 @@ function Planner({ email }: { email: string }) {
   const totalToday = data.today.length
 
   return (
-    <div className="mx-auto grid min-h-dvh max-w-6xl gap-4 px-4 py-4 lg:grid-cols-[210px_minmax(0,1fr)_240px] lg:gap-6">
+    <div
+      className={`mx-auto grid min-h-dvh gap-4 px-4 py-4 lg:gap-6 ${
+        view === 'week'
+          ? 'max-w-7xl lg:grid-cols-[210px_minmax(0,1fr)]'
+          : 'max-w-6xl lg:grid-cols-[210px_minmax(0,1fr)_240px]'
+      }`}
+    >
       <Sidebar
         view={view}
         onView={setView}
@@ -169,6 +188,22 @@ function Planner({ email }: { email: string }) {
 
         {view === 'notes' && (
           <NotesView notes={data.notes} onAdd={add} onPatch={(id, p) => void patch(id, p)} onRemove={(id) => void remove(id)} />
+        )}
+
+        {view === 'week' && (
+          <>
+            {running && (
+              <TimerBar task={running} now={now} onPause={pauseTimer} onFinish={finishTask} />
+            )}
+            <WeekView
+              tasks={data.week}
+              now={now}
+              onPlan={(id, planDate) => void patch(id, { planDate })}
+              onEdit={setDialog}
+              onToggle={toggle}
+              onCreate={(planDate) => setCreating({ planDate, tags: tagFilter })}
+            />
+          </>
         )}
 
         {view === 'time' && <TimeView entries={entries} tasks={tasks} now={now} />}
@@ -200,7 +235,7 @@ function Planner({ email }: { email: string }) {
             ) : (
               view !== 'done' && (
                 <button
-                  onClick={() => setDialog('new')}
+                  onClick={() => setCreating({ dueAt: defaultDue(view, now), tags: tagFilter })}
                   className="mb-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500"
                 >
                   <Plus size={16} /> Новая задача
@@ -272,24 +307,26 @@ function Planner({ email }: { email: string }) {
         )}
       </main>
 
-      <div className="lg:py-6">
-        <div className="lg:sticky lg:top-6">
-          <TimerPanel
-            task={running}
-            now={now}
-            todaySec={todaySec}
-            onPause={pauseTimer}
-            onFinish={finishTask}
-          />
+      {view !== 'week' && (
+        <div className="lg:py-6">
+          <div className="lg:sticky lg:top-6">
+            <TimerPanel
+              task={running}
+              now={now}
+              todaySec={todaySec}
+              onPause={pauseTimer}
+              onFinish={finishTask}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
-      {dialog === 'new' && (
+      {creating && (
         <TaskDialog
           now={now}
-          defaults={{ dueAt: defaultDue(view, now), tags: tagFilter }}
+          defaults={creating}
           onSubmit={submitForm}
-          onClose={() => setDialog(null)}
+          onClose={() => setCreating(null)}
         />
       )}
       {editing && (

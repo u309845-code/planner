@@ -7,6 +7,7 @@ export interface TaskForm {
   title: string
   notes: string
   dueAt: string | null
+  planDate: string | null
   plannedMin: number | null
   priority: Priority
   tags: string[]
@@ -38,6 +39,7 @@ export default function TaskDialog({ task, defaults, days, now, onSubmit, onDele
   const [title, setTitle] = useState(init?.title ?? '')
   const [notes, setNotes] = useState(init?.notes ?? '')
   const [due, setDue] = useState(isoToLocalInput(init?.dueAt ?? null))
+  const [planDay, setPlanDay] = useState(init?.planDate ?? '')
   const [plan, setPlan] = useState(init?.plannedMin == null ? '' : String(init.plannedMin))
   const [priority, setPriority] = useState<Priority>(init?.priority ?? 0)
   const [tags, setTags] = useState<string[]>(init?.tags ?? [])
@@ -57,6 +59,7 @@ export default function TaskDialog({ task, defaults, days, now, onSubmit, onDele
       title: trimmed,
       notes: notes.trim(),
       dueAt: localInputToIso(due),
+      planDate: planDay || null,
       plannedMin: Number.isNaN(planNum) ? null : planNum,
       priority,
       tags,
@@ -117,20 +120,31 @@ export default function TaskDialog({ task, defaults, days, now, onSubmit, onDele
           </label>
         </div>
 
-        <label className="block space-y-1 text-xs text-slate-500">
-          Приоритет
-          <select
-            value={priority}
-            onChange={(e) => setPriority(Number(e.target.value) as Priority)}
-            className={field}
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="space-y-1 text-xs text-slate-500">
+            День в плане
+            <input
+              type="date"
+              value={planDay}
+              onChange={(e) => setPlanDay(e.target.value)}
+              className={field}
+            />
+          </label>
+          <label className="space-y-1 text-xs text-slate-500">
+            Приоритет
+            <select
+              value={priority}
+              onChange={(e) => setPriority(Number(e.target.value) as Priority)}
+              className={field}
+            >
+              {PRIORITIES.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
         <div>
           <p className="mb-1 text-xs text-slate-500">Теги</p>
