@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { Clock, Flame, Plus } from 'lucide-react'
 import Auth from './Auth'
 import NotesView from './components/NotesView'
+import ReportsView from './components/ReportsView'
 import Sidebar, { type View } from './components/Sidebar'
 import TaskDialog, { type TaskForm } from './components/TaskDialog'
 import TaskRow from './components/TaskRow'
@@ -37,6 +38,7 @@ const TITLES: Record<View, string> = {
   quick: 'Быстрые задачи',
   notes: 'Заметки',
   time: 'Время',
+  reports: 'Отчёты',
   done: 'Выполнено',
 }
 
@@ -170,6 +172,8 @@ function Planner({ email }: { email: string }) {
         )}
 
         {view === 'time' && <TimeView entries={entries} tasks={tasks} now={now} />}
+
+        {view === 'reports' && <ReportsView entries={entries} tasks={tasks} now={now} />}
 
         {taskView && (
           <>

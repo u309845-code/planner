@@ -11,36 +11,56 @@ interface Props {
   now: number
 }
 
+const pad = (n: number) => String(n).padStart(2, '0')
+const toInput = (ms: number) => {
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 export default function TimeView({ entries, tasks, now }: Props) {
-  const [offset, setOffset] = useState(0)
-  const day = addDays(dayStart(now), offset)
+  const today = dayStart(now)
+  const [day, setDay] = useState(today)
   const data = useMemo(() => dayBreakdown(entries, tasks, now, day), [entries, tasks, now, day])
   const max = data.byTask[0]?.seconds ?? 1
 
+  function pick(value: string) {
+    if (!value) return
+    const [y, m, d] = value.split('-').map(Number)
+    setDay(Math.min(new Date(y, m - 1, d).getTime(), today))
+  }
+
   return (
     <div>
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <button
-          onClick={() => setOffset(offset - 1)}
+          onClick={() => setDay(addDays(day, -1))}
           aria-label="Предыдущий день"
           className="rounded-lg p-2 hover:bg-slate-200/60 dark:hover:bg-slate-800"
         >
           <ChevronLeft size={18} />
         </button>
-        <h2 className="min-w-40 text-center text-lg font-semibold capitalize">
+        <h2 className="min-w-36 text-center text-lg font-semibold capitalize">
           {formatDayLabel(day, now)}
         </h2>
         <button
-          onClick={() => setOffset(offset + 1)}
-          disabled={offset >= 0}
+          onClick={() => setDay(addDays(day, 1))}
+          disabled={day >= today}
           aria-label="Следующий день"
           className="rounded-lg p-2 hover:bg-slate-200/60 disabled:opacity-30 dark:hover:bg-slate-800"
         >
           <ChevronRight size={18} />
         </button>
-        {offset !== 0 && (
+        <input
+          type="date"
+          value={toInput(day)}
+          max={toInput(today)}
+          onChange={(e) => pick(e.target.value)}
+          aria-label="Выбрать дату"
+          className="rounded-lg bg-white px-3 py-1.5 text-sm outline-none ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500/50 dark:bg-slate-900 dark:ring-slate-800"
+        />
+        {day !== today && (
           <button
-            onClick={() => setOffset(0)}
+            onClick={() => setDay(today)}
             className="rounded-lg px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-slate-800"
           >
             К сегодня
