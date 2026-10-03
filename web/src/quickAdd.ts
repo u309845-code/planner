@@ -20,7 +20,7 @@ export function parseQuick(input: string, kind: Kind, extraTags: string[] = []):
 
   let plannedMin: number | null = null
   text = text.replace(
-    /~\s*(\d+(?:[.,]\d+)?)\s*(ч|час\p{L}*|м|мин\p{L}*)/iu,
+    /~\s*(\d+(?:[.,]\d+)?)\s*(ч(?:ас\p{L}*)?|м(?:ин\p{L}*)?)/iu,
     (_m, num: string, unit: string) => {
       const n = parseFloat(num.replace(',', '.'))
       plannedMin = Math.round(/^ч/i.test(unit) ? n * 60 : n)
