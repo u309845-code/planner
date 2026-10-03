@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import type { Session } from '@supabase/supabase-js'
+import Auth from './Auth'
+import { supabase } from './supabase'
 import { useTasks } from './store'
 import type { Task } from './types'
 
@@ -46,7 +49,22 @@ function localToIso(value: string): string | null {
 }
 
 export default function App() {
-  const { tasks, add, toggle, remove } = useTasks()
+  // undefined — ещё проверяем сессию, null — не вошли
+  const [session, setSession] = useState<Session | null | undefined>(undefined)
+
+  useEffect(() => {
+    void supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    return () => data.subscription.unsubscribe()
+  }, [])
+
+  if (session === undefined) return null
+  if (session === null) return <Auth />
+  return <Planner email={session.user.email ?? ''} />
+}
+
+function Planner({ email }: { email: string }) {
+  const { tasks, loading, error, add, toggle, remove } = useTasks()
   const [tab, setTab] = useState<Tab>('today')
   const [title, setTitle] = useState('')
   const [notes, setNotes] = useState('')
@@ -85,7 +103,24 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-dvh max-w-xl px-4 pb-16 pt-6">
-      <h1 className="mb-5 text-2xl font-bold tracking-tight">Планер</h1>
+      <header className="mb-5 flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight">Планер</h1>
+        <div className="flex min-w-0 items-center gap-2 text-xs text-slate-500">
+          <span className="truncate">{email}</span>
+          <button
+            onClick={() => void supabase.auth.signOut()}
+            className="shrink-0 rounded-md px-2 py-1 ring-1 ring-slate-300 hover:text-slate-800 dark:ring-slate-700 dark:hover:text-slate-200"
+          >
+            Выйти
+          </button>
+        </div>
+      </header>
+
+      {error && (
+        <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950 dark:text-red-300">
+          Ошибка: {error}
+        </p>
+      )}
 
       <form
         onSubmit={submit}
@@ -137,7 +172,9 @@ export default function App() {
         ))}
       </nav>
 
-      {visible.length === 0 ? (
+      {loading ? (
+        <p className="py-12 text-center text-sm text-slate-400">Загрузка…</p>
+      ) : visible.length === 0 ? (
         <p className="py-12 text-center text-sm text-slate-400">{EMPTY[tab]}</p>
       ) : (
         <ul className="space-y-2">
