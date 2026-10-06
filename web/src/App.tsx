@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { Clock, Flame, Plus } from 'lucide-react'
 import Auth from './Auth'
+import HomeHero from './components/HomeHero'
 import MonthView from './components/MonthView'
 import NotesView from './components/NotesView'
 import ReportsView from './components/ReportsView'
@@ -164,6 +165,8 @@ function Planner({ email }: { email: string }) {
 
         {view === 'today' && (
           <>
+            <HomeHero total={totalToday} done={data.todayDone} hot={data.counts.hot} />
+
             <button
               onClick={() => setCreating({ dueAt: defaultDueToday(now), tags: tagFilter })}
               className="mb-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500"

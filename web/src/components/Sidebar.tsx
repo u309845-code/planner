@@ -26,7 +26,7 @@ interface Props {
 }
 
 const ITEMS: { id: View; label: string; icon: LucideIcon }[] = [
-  { id: 'today', label: 'Сегодня', icon: CalendarCheck },
+  { id: 'today', label: 'Главная', icon: CalendarCheck },
   { id: 'calendar', label: 'Календарь', icon: CalendarRange },
   { id: 'tasks', label: 'Все задачи', icon: ListChecks },
   { id: 'notes', label: 'Заметки', icon: StickyNote },
