@@ -1,22 +1,17 @@
 import { ChevronLeft, ChevronRight, Flag, Plus } from 'lucide-react'
 import { useState, type DragEvent } from 'react'
-import {
-  bucketOf,
-  byDue,
-  formatDue,
-  formatMinutes,
-  fromDateKey,
-  toDateKey,
-  weekStart,
-} from '../dates'
+import { deadlinesOn, plannedOn } from '../calendar'
+import { byDue, formatDue, formatMinutes, toDateKey, weekStart } from '../dates'
 import { addDays, dayStart } from '../stats'
-import { tagById } from '../tags'
 import type { Task } from '../types'
+import TaskCard from './TaskCard'
 
 interface Props {
   /** Задачи (уже отфильтрованные по тегам), без заметок */
   tasks: Task[]
   now: number
+  /** Какая неделя открыта сначала (любой день недели) */
+  initialAnchor: number
   onPlan: (id: string, planDate: string | null) => void
   onEdit: (id: string) => void
   onToggle: (id: string) => void
@@ -26,11 +21,17 @@ interface Props {
 const fmt = (ms: number, opts: Intl.DateTimeFormatOptions) =>
   new Date(ms).toLocaleDateString('ru-RU', opts)
 
-const sameDay = (iso: string, key: string) => toDateKey(new Date(iso).getTime()) === key
-
-export default function WeekView({ tasks, now, onPlan, onEdit, onToggle, onCreate }: Props) {
+export default function WeekView({
+  tasks,
+  now,
+  initialAnchor,
+  onPlan,
+  onEdit,
+  onToggle,
+  onCreate,
+}: Props) {
   const today = dayStart(now)
-  const [anchor, setAnchor] = useState(today)
+  const [anchor, setAnchor] = useState(initialAnchor)
   const [dragging, setDragging] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
 
@@ -60,7 +61,7 @@ export default function WeekView({ tasks, now, onPlan, onEdit, onToggle, onCreat
   })
 
   const card = (t: Task) => (
-    <WeekCard
+    <TaskCard
       key={t.id}
       task={t}
       now={now}
@@ -121,12 +122,8 @@ export default function WeekView({ tasks, now, onPlan, onEdit, onToggle, onCreat
         {days.map((d) => {
           const key = toDateKey(d)
           const isToday = key === todayKey
-          const planned = tasks
-            .filter((t) => t.planDate === key)
-            .sort((a, b) => Number(a.done) - Number(b.done) || byDue(a, b))
-          const deadlines = tasks.filter(
-            (t) => !t.done && t.dueAt && t.planDate !== key && sameDay(t.dueAt, key),
-          )
+          const planned = plannedOn(tasks, key)
+          const deadlines = deadlinesOn(tasks, key)
           const planMin = planned.reduce((s, t) => s + (t.plannedMin ?? 0), 0)
           const isOver = over === key
           return (
@@ -212,74 +209,6 @@ export default function WeekView({ tasks, now, onPlan, onEdit, onToggle, onCreat
         Перетаскивайте карточки мышью. Тот же результат даёт поле «День в плане» в задаче. На телефоне
         перетаскивание пока не работает.
       </p>
-    </div>
-  )
-}
-
-function WeekCard({
-  task: t,
-  now,
-  dragging,
-  onDragStart,
-  onDragEnd,
-  onEdit,
-  onToggle,
-}: {
-  task: Task
-  now: number
-  dragging: boolean
-  onDragStart: (e: DragEvent) => void
-  onDragEnd: () => void
-  onEdit: (id: string) => void
-  onToggle: (id: string) => void
-}) {
-  const bucket = bucketOf(t, now)
-  const tone =
-    bucket === 'hot'
-      ? 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40'
-      : bucket === 'soon'
-        ? 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40'
-        : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'
-  const overdue = t.planDate && !t.done && fromDateKey(t.planDate) < dayStart(now)
-
-  return (
-    <div
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      className={`cursor-grab rounded-xl border p-2 text-sm active:cursor-grabbing ${tone} ${
-        dragging ? 'opacity-40' : ''
-      } ${t.done ? 'opacity-60' : ''}`}
-    >
-      <div className="flex items-start gap-2">
-        <input
-          type="checkbox"
-          checked={t.done}
-          onChange={() => onToggle(t.id)}
-          aria-label="Выполнено"
-          className="mt-0.5 size-4 shrink-0 accent-emerald-600"
-        />
-        <button onClick={() => onEdit(t.id)} className="min-w-0 flex-1 text-left">
-          <span className={`block break-words leading-snug ${t.done ? 'line-through' : ''}`}>
-            {t.priority > 0 && !t.done && (
-              <Flag
-                size={12}
-                className={`mr-1 inline -translate-y-px ${t.priority === 2 ? 'text-red-500' : 'text-amber-500'}`}
-              />
-            )}
-            {t.title}
-          </span>
-        </button>
-      </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1 pl-6 text-[11px] text-slate-500">
-        {t.tags.map((id) => {
-          const tag = tagById(id)
-          return tag ? <span key={id} className={`size-2 rounded-full ${tag.dot}`} title={tag.label} /> : null
-        })}
-        {t.dueAt && !t.done && <span>{formatDue(t.dueAt, now)}</span>}
-        {t.plannedMin !== null && <span>· {formatMinutes(t.plannedMin)}</span>}
-        {overdue && <span className="text-red-500">· план прошёл</span>}
-      </div>
     </div>
   )
 }

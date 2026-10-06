@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { runningSec, totalSpentSec } from './dates'
+import { nextOccurrence } from './recurrence'
 import { supabase } from './supabase'
-import type { NewTask, Patch, Priority, Task, TimeEntry } from './types'
+import type { ChecklistItem, NewTask, Patch, Priority, Recurrence, Task, TimeEntry } from './types'
 
 interface Row {
   id: string
@@ -17,6 +18,8 @@ interface Row {
   planned_min: number | null
   spent_sec: number
   timer_started_at: string | null
+  checklist: ChecklistItem[] | null
+  recurrence: Recurrence | null
   created_at: string
 }
 
@@ -44,6 +47,8 @@ const fromRow = (r: Row): Task => ({
   plannedMin: r.planned_min,
   spentSec: r.spent_sec,
   timerStartedAt: r.timer_started_at,
+  checklist: r.checklist ?? [],
+  recurrence: r.recurrence ?? null,
   createdAt: r.created_at,
 })
 
@@ -71,6 +76,8 @@ function toRow(p: Patch): Record<string, unknown> {
   if (p.plannedMin !== undefined) row.planned_min = p.plannedMin
   if (p.spentSec !== undefined) row.spent_sec = p.spentSec
   if (p.timerStartedAt !== undefined) row.timer_started_at = p.timerStartedAt
+  if (p.checklist !== undefined) row.checklist = p.checklist
+  if (p.recurrence !== undefined) row.recurrence = p.recurrence
   return row
 }
 
@@ -123,6 +130,8 @@ export function useTasks() {
         tags: t.tags ?? [],
         priority: t.priority ?? 0,
         planned_min: t.plannedMin ?? null,
+        checklist: t.checklist ?? [],
+        recurrence: t.recurrence ?? null,
       })
       .select()
       .single()
@@ -197,6 +206,39 @@ export function useTasks() {
     [tasks, stopTimer],
   )
 
+  /** Регулярная задача: при закрытии создаём следующую (если такой ещё нет). */
+  const spawnNext = useCallback(
+    (t: Task) => {
+      if (!t.recurrence) return
+      const next = nextOccurrence(t, t.recurrence, Date.now())
+      const same = (a: string | null, b: string | null) =>
+        (a ? new Date(a).getTime() : null) === (b ? new Date(b).getTime() : null)
+      const exists = tasks.some(
+        (x) =>
+          !x.done &&
+          x.id !== t.id &&
+          x.recurrence &&
+          x.title === t.title &&
+          same(x.dueAt, next.dueAt) &&
+          x.planDate === next.planDate,
+      )
+      if (exists) return
+      void add({
+        title: t.title,
+        notes: t.notes,
+        kind: 'task',
+        tags: t.tags,
+        priority: t.priority,
+        plannedMin: t.plannedMin,
+        dueAt: next.dueAt,
+        planDate: next.planDate,
+        checklist: t.checklist.map((i) => ({ ...i, done: false })),
+        recurrence: t.recurrence,
+      })
+    },
+    [tasks, add],
+  )
+
   /** Остановить таймер (если идёт) и отметить задачу выполненной. */
   const finishTask = useCallback(
     (id: string) => {
@@ -205,8 +247,9 @@ export function useTasks() {
       const done = { done: true, doneAt: new Date().toISOString() }
       if (t.timerStartedAt) stopTimer(t, done)
       else void patch(id, done)
+      if (!t.done) spawnNext(t)
     },
-    [tasks, stopTimer, patch],
+    [tasks, stopTimer, patch, spawnNext],
   )
 
   const toggle = useCallback(

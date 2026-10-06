@@ -1,6 +1,19 @@
 export type Kind = 'task' | 'note'
 export type Priority = 0 | 1 | 2
 
+export interface ChecklistItem {
+  id: string
+  text: string
+  done: boolean
+}
+
+/** Правило повтора. Для weekly дни недели: 0 = понедельник … 6 = воскресенье. */
+export type Recurrence =
+  | { freq: 'daily' }
+  | { freq: 'weekdays' }
+  | { freq: 'weekly'; days: number[] }
+  | { freq: 'monthly' }
+
 export interface Task {
   id: string
   title: string
@@ -20,6 +33,9 @@ export interface Task {
   spentSec: number
   /** Когда запущен таймер; null, если не идёт */
   timerStartedAt: string | null
+  checklist: ChecklistItem[]
+  /** Правило повтора; null — задача не повторяется */
+  recurrence: Recurrence | null
   createdAt: string
 }
 
@@ -32,6 +48,8 @@ export interface NewTask {
   tags?: string[]
   priority?: Priority
   plannedMin?: number | null
+  checklist?: ChecklistItem[]
+  recurrence?: Recurrence | null
 }
 
 export type Patch = Partial<Omit<Task, 'id' | 'createdAt'>>

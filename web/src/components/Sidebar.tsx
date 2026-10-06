@@ -2,25 +2,21 @@ import {
   BarChart3,
   CalendarCheck,
   CalendarRange,
-  CheckCheck,
-  Clock,
-  Flame,
+  ListChecks,
   LogOut,
   Moon,
   StickyNote,
   Sun,
-  Timer,
-  Zap,
   type LucideIcon,
 } from 'lucide-react'
 import { TAGS } from '../tags'
 
-export type View = 'today' | 'week' | 'hot' | 'soon' | 'quick' | 'notes' | 'time' | 'reports' | 'done'
+export type View = 'today' | 'calendar' | 'tasks' | 'notes' | 'reports'
 
 interface Props {
   view: View
   onView: (v: View) => void
-  counts: { hot: number; soon: number; quick: number }
+  counts: { hot: number; soon: number }
   tagFilter: string[]
   onTag: (id: string) => void
   email: string
@@ -29,23 +25,13 @@ interface Props {
   onSignOut: () => void
 }
 
-const ITEMS: { id: View; label: string; icon: LucideIcon; count?: 'hot' | 'soon' | 'quick' }[] = [
+const ITEMS: { id: View; label: string; icon: LucideIcon }[] = [
   { id: 'today', label: 'Сегодня', icon: CalendarCheck },
-  { id: 'week', label: 'Неделя', icon: CalendarRange },
-  { id: 'hot', label: 'Горит', icon: Flame, count: 'hot' },
-  { id: 'soon', label: 'Скоро', icon: Clock, count: 'soon' },
-  { id: 'quick', label: 'Быстрые задачи', icon: Zap, count: 'quick' },
+  { id: 'calendar', label: 'Календарь', icon: CalendarRange },
+  { id: 'tasks', label: 'Все задачи', icon: ListChecks },
   { id: 'notes', label: 'Заметки', icon: StickyNote },
-  { id: 'time', label: 'Время', icon: Timer },
   { id: 'reports', label: 'Отчёты', icon: BarChart3 },
-  { id: 'done', label: 'Выполнено', icon: CheckCheck },
 ]
-
-const BADGE = {
-  hot: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
-  soon: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
-  quick: 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-} as const
 
 export default function Sidebar({
   view,
@@ -63,26 +49,34 @@ export default function Sidebar({
       <h1 className="px-2 text-xl font-bold tracking-tight">Планер</h1>
 
       <nav className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-        {ITEMS.map(({ id, label, icon: Icon, count }) => {
-          const n = count ? counts[count] : 0
-          return (
-            <button
-              key={id}
-              onClick={() => onView(id)}
-              className={`flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition ${
-                view === id
-                  ? 'bg-slate-200/70 font-medium dark:bg-slate-800'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
-              }`}
-            >
-              <Icon size={17} />
-              <span className="flex-1 text-left">{label}</span>
-              {count && n > 0 && (
-                <span className={`rounded-md px-1.5 text-xs ${BADGE[count]}`}>{n}</span>
-              )}
-            </button>
-          )
-        })}
+        {ITEMS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => onView(id)}
+            className={`flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition ${
+              view === id
+                ? 'bg-slate-200/70 font-medium dark:bg-slate-800'
+                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'
+            }`}
+          >
+            <Icon size={17} />
+            <span className="flex-1 text-left">{label}</span>
+            {id === 'tasks' && (
+              <span className="flex gap-1 text-xs">
+                {counts.hot > 0 && (
+                  <span className="rounded-md bg-red-100 px-1.5 text-red-700 dark:bg-red-950 dark:text-red-300">
+                    {counts.hot}
+                  </span>
+                )}
+                {counts.soon > 0 && (
+                  <span className="rounded-md bg-amber-100 px-1.5 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                    {counts.soon}
+                  </span>
+                )}
+              </span>
+            )}
+          </button>
+        ))}
       </nav>
 
       <div className="hidden lg:block">

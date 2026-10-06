@@ -1,17 +1,29 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { Clock, Flame, Plus } from 'lucide-react'
 import Auth from './Auth'
+import MonthView from './components/MonthView'
 import NotesView from './components/NotesView'
 import ReportsView from './components/ReportsView'
+import RunningBar from './components/RunningBar'
+import Segmented from './components/Segmented'
 import Sidebar, { type View } from './components/Sidebar'
 import TaskDialog, { type TaskForm } from './components/TaskDialog'
 import TaskRow from './components/TaskRow'
+import TasksBoard from './components/TasksBoard'
 import TimeView from './components/TimeView'
-import TimerBar from './components/TimerBar'
-import TimerPanel from './components/TimerPanel'
 import WeekView from './components/WeekView'
-import { bucketOf, byDue, endOfDay, formatDue, formatSpent, isSameDay, toDateKey } from './dates'
+import {
+  bucketOf,
+  byDue,
+  endOfDay,
+  formatClock,
+  formatDue,
+  formatSpent,
+  isSameDay,
+  toDateKey,
+  totalSpentSec,
+} from './dates'
 import { useNow, useTheme } from './hooks'
 import { dayBreakdown, taskDays } from './stats'
 import { supabase } from './supabase'
@@ -33,41 +45,11 @@ export default function App() {
   return <Planner email={session.user.email ?? ''} />
 }
 
-const TITLES: Record<View, string> = {
-  today: 'Фокус на сегодня',
-  week: 'Неделя',
-  hot: 'Горит',
-  soon: 'Скоро',
-  quick: 'Быстрые задачи',
-  notes: 'Заметки',
-  time: 'Время',
-  reports: 'Отчёты',
-  done: 'Выполнено',
-}
-
-const EMPTY: Partial<Record<View, string>> = {
-  today: 'На сегодня ничего нет. Добавьте задачу или отдохните.',
-  hot: 'Ничего не горит. Хорошая новость.',
-  soon: 'В ближайшие три дня дедлайнов нет.',
-  quick: 'Запишите задачу одной строкой, детали добавите потом.',
-  done: 'Выполненных задач пока нет.',
-}
-
-/** Срок по умолчанию для новой задачи, чтобы она сразу попала в текущий раздел. */
-function defaultDue(view: View, now: number): string | null {
-  if (view === 'today' || view === 'hot') {
-    const d = new Date(now)
-    d.setHours(18, 0, 0, 0)
-    const t = Math.min(Math.max(d.getTime(), now + 3_600_000), endOfDay(now))
-    return new Date(t).toISOString()
-  }
-  if (view === 'soon') {
-    const d = new Date(now)
-    d.setDate(d.getDate() + 2)
-    d.setHours(18, 0, 0, 0)
-    return d.toISOString()
-  }
-  return null
+/** Срок по умолчанию для новой задачи на «Сегодня»: сегодня к 18:00 (но не раньше, чем через час). */
+function defaultDueToday(now: number): string {
+  const d = new Date(now)
+  d.setHours(18, 0, 0, 0)
+  return new Date(Math.min(Math.max(d.getTime(), now + 3_600_000), endOfDay(now))).toISOString()
 }
 
 function Planner({ email }: { email: string }) {
@@ -89,28 +71,37 @@ function Planner({ email }: { email: string }) {
   const { theme, toggle: toggleTheme } = useTheme()
 
   const [view, setView] = useState<View>('today')
+  const [calendarMode, setCalendarMode] = useState<'week' | 'month'>('week')
+  const [weekFocus, setWeekFocus] = useState(() => Date.now())
+  const [reportsTab, setReportsTab] = useState<'analytics' | 'days'>('analytics')
   const [tagFilter, setTagFilter] = useState<string[]>([])
   // id редактируемой задачи
   const [dialog, setDialog] = useState<string | null>(null)
   // не null — открыта форма новой задачи с этими значениями по умолчанию
   const [creating, setCreating] = useState<Partial<TaskForm> | null>(null)
-  const [quickText, setQuickText] = useState('')
 
   const editing = dialog ? tasks.find((t) => t.id === dialog) : undefined
 
+  // время идущего таймера видно и в названии вкладки браузера
+  useEffect(() => {
+    document.title = running
+      ? `▶ ${formatClock(totalSpentSec(running, now))} · ${running.title}`
+      : 'Планер'
+  }, [running, now])
+
   const data = useMemo(() => {
     const matches = (t: Task) => tagFilter.every((g) => t.tags.includes(g))
-    const allOpen = tasks.filter((t) => t.kind === 'task' && !t.done)
+    const allTasks = tasks.filter((t) => t.kind === 'task')
+    const allOpen = allTasks.filter((t) => !t.done)
     const counts = {
       hot: allOpen.filter((t) => bucketOf(t, now) === 'hot').length,
       soon: allOpen.filter((t) => bucketOf(t, now) === 'soon').length,
-      quick: allOpen.filter((t) => !t.dueAt && !t.planDate).length,
     }
     const open = allOpen.filter(matches)
     const end = endOfDay(now)
     const todayKey = toDateKey(now)
-    const todayDone = tasks.filter(
-      (t) => t.kind === 'task' && t.done && t.doneAt && isSameDay(t.doneAt, now) && matches(t),
+    const todayDone = allTasks.filter(
+      (t) => t.done && t.doneAt && isSameDay(t.doneAt, now) && matches(t),
     )
     // на сегодня: срок сегодня или раньше, либо день в плане сегодня или раньше
     const todayOpen = open
@@ -121,16 +112,12 @@ function Planner({ email }: { email: string }) {
       .sort(byDue)
     return {
       counts,
-      week: tasks.filter((t) => t.kind === 'task' && matches(t)),
+      tasks: allTasks.filter(matches),
       hot: open.filter((t) => bucketOf(t, now) === 'hot').sort(byDue),
       soon: open.filter((t) => bucketOf(t, now) === 'soon').sort(byDue),
       today: [...todayOpen, ...todayDone],
       todayDone: todayDone.length,
-      quick: open.filter((t) => !t.dueAt && !t.planDate),
       notes: tasks.filter((t) => t.kind === 'note'),
-      done: tasks
-        .filter((t) => t.kind === 'task' && t.done && matches(t))
-        .sort((a, b) => (b.doneAt ?? '').localeCompare(a.doneAt ?? '')),
     }
   }, [tasks, tagFilter, now])
 
@@ -144,27 +131,16 @@ function Planner({ email }: { email: string }) {
     else void add({ ...form, kind: 'task' })
   }
 
-  function submitQuick(e: FormEvent) {
-    e.preventDefault()
-    const title = quickText.trim()
-    if (!title) return
-    void add({ title, kind: 'task', tags: tagFilter })
-    setQuickText('')
-  }
-
   const toggleTag = (id: string) =>
     setTagFilter((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
 
-  const taskView = view === 'today' || view === 'hot' || view === 'soon' || view === 'quick' || view === 'done'
-  const list = taskView ? data[view] : []
+  const planTask = (id: string, planDate: string | null) => void patch(id, { planDate })
   const totalToday = data.today.length
 
   return (
     <div
-      className={`mx-auto grid min-h-dvh gap-4 px-4 py-4 lg:gap-6 ${
-        view === 'week'
-          ? 'max-w-7xl lg:grid-cols-[210px_minmax(0,1fr)]'
-          : 'max-w-6xl lg:grid-cols-[210px_minmax(0,1fr)_240px]'
+      className={`mx-auto grid min-h-dvh max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[210px_minmax(0,1fr)] lg:gap-6 ${
+        running ? 'pb-32' : ''
       }`}
     >
       <Sidebar
@@ -186,64 +162,16 @@ function Planner({ email }: { email: string }) {
           </p>
         )}
 
-        {view === 'notes' && (
-          <NotesView notes={data.notes} onAdd={add} onPatch={(id, p) => void patch(id, p)} onRemove={(id) => void remove(id)} />
-        )}
-
-        {view === 'week' && (
+        {view === 'today' && (
           <>
-            {running && (
-              <TimerBar task={running} now={now} onPause={pauseTimer} onFinish={finishTask} />
-            )}
-            <WeekView
-              tasks={data.week}
-              now={now}
-              onPlan={(id, planDate) => void patch(id, { planDate })}
-              onEdit={setDialog}
-              onToggle={toggle}
-              onCreate={(planDate) => setCreating({ planDate, tags: tagFilter })}
-            />
-          </>
-        )}
+            <button
+              onClick={() => setCreating({ dueAt: defaultDueToday(now), tags: tagFilter })}
+              className="mb-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500"
+            >
+              <Plus size={16} /> Новая задача
+            </button>
 
-        {view === 'time' && <TimeView entries={entries} tasks={tasks} now={now} />}
-
-        {view === 'reports' && <ReportsView entries={entries} tasks={tasks} now={now} />}
-
-        {taskView && (
-          <>
-            {view === 'quick' ? (
-              <form
-                onSubmit={submitQuick}
-                className="mb-4 flex items-center gap-2 rounded-2xl bg-white p-2 pl-3 ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-indigo-500/50 dark:bg-slate-900 dark:ring-slate-800"
-              >
-                <Plus size={18} className="shrink-0 text-slate-400" />
-                <input
-                  value={quickText}
-                  onChange={(e) => setQuickText(e.target.value)}
-                  placeholder="Что нужно сделать?"
-                  autoFocus
-                  className="min-w-0 flex-1 bg-transparent py-1.5 text-base outline-none placeholder:text-slate-400"
-                />
-                <button
-                  type="submit"
-                  className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"
-                >
-                  Добавить
-                </button>
-              </form>
-            ) : (
-              view !== 'done' && (
-                <button
-                  onClick={() => setCreating({ dueAt: defaultDue(view, now), tags: tagFilter })}
-                  className="mb-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500"
-                >
-                  <Plus size={16} /> Новая задача
-                </button>
-              )
-            )}
-
-            {view === 'today' && (data.hot.length > 0 || data.soon.length > 0) && (
+            {(data.hot.length > 0 || data.soon.length > 0) && (
               <div className="mb-5 grid gap-3 sm:grid-cols-2">
                 <DeadlineCard
                   title="Горит · до 1 дня"
@@ -251,7 +179,7 @@ function Planner({ email }: { email: string }) {
                   tone="hot"
                   items={data.hot}
                   now={now}
-                  onOpen={() => setView('hot')}
+                  onOpen={() => setView('tasks')}
                   onEdit={setDialog}
                 />
                 <DeadlineCard
@@ -260,22 +188,21 @@ function Planner({ email }: { email: string }) {
                   tone="soon"
                   items={data.soon}
                   now={now}
-                  onOpen={() => setView('soon')}
+                  onOpen={() => setView('tasks')}
                   onEdit={setDialog}
                 />
               </div>
             )}
 
-            <div className="mb-1 flex items-baseline justify-between gap-3">
-              <h2 className="text-lg font-semibold">{TITLES[view]}</h2>
-              {view === 'today' && totalToday > 0 && (
-                <span className="text-sm text-slate-500">
-                  сделано {data.todayDone} из {totalToday}
-                  {todaySec > 0 && ` · записано ${formatSpent(todaySec)}`}
-                </span>
-              )}
+            <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3">
+              <h2 className="text-lg font-semibold">Фокус на сегодня</h2>
+              <span className="text-sm text-slate-500">
+                {totalToday > 0 && `сделано ${data.todayDone} из ${totalToday}`}
+                {totalToday > 0 && todaySec > 0 && ' · '}
+                {todaySec > 0 && `записано ${formatSpent(todaySec)}`}
+              </span>
             </div>
-            {view === 'today' && totalToday > 0 && (
+            {totalToday > 0 && (
               <div className="mb-2 h-1.5 rounded-full bg-slate-200 dark:bg-slate-800">
                 <div
                   className="h-1.5 rounded-full bg-emerald-500 transition-all"
@@ -286,11 +213,13 @@ function Planner({ email }: { email: string }) {
 
             {loading ? (
               <p className="py-12 text-center text-sm text-slate-400">Загрузка…</p>
-            ) : list.length === 0 ? (
-              <p className="py-12 text-center text-sm text-slate-400">{EMPTY[view]}</p>
+            ) : totalToday === 0 ? (
+              <p className="py-12 text-center text-sm text-slate-400">
+                На сегодня ничего нет. Добавьте задачу или отдохните.
+              </p>
             ) : (
               <ul className="rounded-2xl bg-white px-4 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
-                {list.map((t) => (
+                {data.today.map((t) => (
                   <TaskRow
                     key={t.id}
                     task={t}
@@ -299,26 +228,97 @@ function Planner({ email }: { email: string }) {
                     onEdit={setDialog}
                     onStart={startTimer}
                     onPause={pauseTimer}
+                    onChecklist={(id, checklist) => void patch(id, { checklist })}
                   />
                 ))}
               </ul>
             )}
           </>
         )}
+
+        {view === 'calendar' && (
+          <>
+            <div className="mb-4">
+              <Segmented
+                value={calendarMode}
+                onChange={setCalendarMode}
+                options={[
+                  { id: 'week', label: 'Неделя' },
+                  { id: 'month', label: 'Месяц' },
+                ]}
+              />
+            </div>
+            {calendarMode === 'week' ? (
+              <WeekView
+                key={weekFocus}
+                tasks={data.tasks}
+                now={now}
+                initialAnchor={weekFocus}
+                onPlan={planTask}
+                onEdit={setDialog}
+                onToggle={toggle}
+                onCreate={(planDate) => setCreating({ planDate, tags: tagFilter })}
+              />
+            ) : (
+              <MonthView
+                tasks={data.tasks}
+                now={now}
+                onPlan={planTask}
+                onEdit={setDialog}
+                onCreate={(planDate) => setCreating({ planDate, tags: tagFilter })}
+                onOpenDay={(day) => {
+                  setWeekFocus(day)
+                  setCalendarMode('week')
+                }}
+              />
+            )}
+          </>
+        )}
+
+        {view === 'tasks' && (
+          <TasksBoard
+            tasks={data.tasks}
+            now={now}
+            onEdit={setDialog}
+            onToggle={toggle}
+            onSetDue={(id, dueAt) => void patch(id, { dueAt })}
+            onQuickAdd={(title) => void add({ title, kind: 'task', tags: tagFilter })}
+            onNew={() => setCreating({ tags: tagFilter })}
+          />
+        )}
+
+        {view === 'notes' && (
+          <NotesView
+            notes={data.notes}
+            onAdd={add}
+            onPatch={(id, p) => void patch(id, p)}
+            onRemove={(id) => void remove(id)}
+          />
+        )}
+
+        {view === 'reports' && (
+          <>
+            <div className="mb-4">
+              <Segmented
+                value={reportsTab}
+                onChange={setReportsTab}
+                options={[
+                  { id: 'analytics', label: 'Аналитика' },
+                  { id: 'days', label: 'По дням' },
+                ]}
+              />
+            </div>
+            {reportsTab === 'analytics' ? (
+              <ReportsView entries={entries} tasks={tasks} now={now} />
+            ) : (
+              <TimeView entries={entries} tasks={tasks} now={now} />
+            )}
+          </>
+        )}
       </main>
 
-      {view !== 'week' && (
-        <div className="lg:py-6">
-          <div className="lg:sticky lg:top-6">
-            <TimerPanel
-              task={running}
-              now={now}
-              todaySec={todaySec}
-              onPause={pauseTimer}
-              onFinish={finishTask}
-            />
-          </div>
-        </div>
+      {running && (
+        <RunningBar task={running} now={now} onPause={pauseTimer} onFinish={finishTask} />
       )}
 
       {creating && (

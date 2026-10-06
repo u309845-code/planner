@@ -1,7 +1,8 @@
+import { Plus, X } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { formatDayLabel, formatSpent, isoToLocalInput, localInputToIso } from '../dates'
 import { TAGS } from '../tags'
-import type { Priority, Task } from '../types'
+import type { ChecklistItem, Priority, Recurrence, Task } from '../types'
 
 export interface TaskForm {
   title: string
@@ -11,6 +12,8 @@ export interface TaskForm {
   plannedMin: number | null
   priority: Priority
   tags: string[]
+  checklist: ChecklistItem[]
+  recurrence: Recurrence | null
 }
 
 interface Props {
@@ -31,6 +34,16 @@ const PRIORITIES: { value: Priority; label: string }[] = [
   { value: 2, label: 'Очень важный' },
 ]
 
+const FREQS = [
+  { value: '', label: 'Не повторять' },
+  { value: 'daily', label: 'Каждый день' },
+  { value: 'weekdays', label: 'По будням' },
+  { value: 'weekly', label: 'Каждую неделю' },
+  { value: 'monthly', label: 'Каждый месяц' },
+] as const
+
+const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+
 const field =
   'w-full rounded-lg bg-slate-100 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/40 dark:bg-slate-800'
 
@@ -43,6 +56,9 @@ export default function TaskDialog({ task, defaults, days, now, onSubmit, onDele
   const [plan, setPlan] = useState(init?.plannedMin == null ? '' : String(init.plannedMin))
   const [priority, setPriority] = useState<Priority>(init?.priority ?? 0)
   const [tags, setTags] = useState<string[]>(init?.tags ?? [])
+  const [checklist, setChecklist] = useState<ChecklistItem[]>(init?.checklist ?? [])
+  const [newItem, setNewItem] = useState('')
+  const [recurrence, setRecurrence] = useState<Recurrence | null>(init?.recurrence ?? null)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -50,11 +66,37 @@ export default function TaskDialog({ task, defaults, days, now, onSubmit, onDele
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  function addItem() {
+    const text = newItem.trim()
+    if (!text) return
+    setChecklist((prev) => [...prev, { id: crypto.randomUUID(), text, done: false }])
+    setNewItem('')
+  }
+
+  function setFreq(value: string) {
+    if (!value) return setRecurrence(null)
+    if (value === 'weekly') {
+      const base = due ? new Date(due) : planDay ? new Date(planDay + 'T00:00') : new Date(now)
+      return setRecurrence({ freq: 'weekly', days: [(base.getDay() + 6) % 7] })
+    }
+    setRecurrence({ freq: value } as Recurrence)
+  }
+
+  function toggleWeekday(d: number) {
+    setRecurrence((r) => {
+      if (r?.freq !== 'weekly') return r
+      const days = r.days.includes(d) ? r.days.filter((x) => x !== d) : [...r.days, d]
+      return { freq: 'weekly', days: days.length ? days : r.days }
+    })
+  }
+
   function submit(e: FormEvent) {
     e.preventDefault()
     const trimmed = title.trim()
     if (!trimmed) return
     const planNum = plan.trim() === '' ? NaN : Math.max(0, Math.round(Number(plan)))
+    // недописанный пункт чеклиста не теряем
+    const pending = newItem.trim()
     onSubmit({
       title: trimmed,
       notes: notes.trim(),
@@ -63,6 +105,10 @@ export default function TaskDialog({ task, defaults, days, now, onSubmit, onDele
       plannedMin: Number.isNaN(planNum) ? null : planNum,
       priority,
       tags,
+      checklist: pending
+        ? [...checklist, { id: crypto.randomUUID(), text: pending, done: false }]
+        : checklist,
+      recurrence,
     })
     onClose()
   }
@@ -74,7 +120,7 @@ export default function TaskDialog({ task, defaults, days, now, onSubmit, onDele
 
   return (
     <div
-      className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <form
@@ -96,6 +142,72 @@ export default function TaskDialog({ task, defaults, days, now, onSubmit, onDele
           rows={3}
           className={`${field} resize-none`}
         />
+
+        <div>
+          <p className="mb-1 text-xs text-slate-500">
+            Чеклист
+            {checklist.length > 0 &&
+              ` · ${checklist.filter((i) => i.done).length} из ${checklist.length}`}
+          </p>
+          <ul className="space-y-1">
+            {checklist.map((item) => (
+              <li key={item.id} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={item.done}
+                  onChange={() =>
+                    setChecklist((prev) =>
+                      prev.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)),
+                    )
+                  }
+                  aria-label="Пункт выполнен"
+                  className="size-4 shrink-0 accent-emerald-600"
+                />
+                <input
+                  value={item.text}
+                  onChange={(e) =>
+                    setChecklist((prev) =>
+                      prev.map((i) => (i.id === item.id ? { ...i, text: e.target.value } : i)),
+                    )
+                  }
+                  className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
+                    item.done ? 'text-slate-400 line-through' : ''
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setChecklist((prev) => prev.filter((i) => i.id !== item.id))}
+                  aria-label="Удалить пункт"
+                  className="rounded p-1 text-slate-400 hover:text-red-500"
+                >
+                  <X size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-1.5 flex items-center gap-2">
+            <input
+              value={newItem}
+              onChange={(e) => setNewItem(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addItem()
+                }
+              }}
+              placeholder="Добавить пункт"
+              className={field}
+            />
+            <button
+              type="button"
+              onClick={addItem}
+              aria-label="Добавить пункт"
+              className="shrink-0 rounded-lg bg-slate-100 p-2 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <label className="space-y-1 text-xs text-slate-500">
@@ -144,6 +256,46 @@ export default function TaskDialog({ task, defaults, days, now, onSubmit, onDele
               ))}
             </select>
           </label>
+        </div>
+
+        <div>
+          <label className="block space-y-1 text-xs text-slate-500">
+            Повтор
+            <select
+              value={recurrence?.freq ?? ''}
+              onChange={(e) => setFreq(e.target.value)}
+              className={field}
+            >
+              {FREQS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {recurrence?.freq === 'weekly' && (
+            <div className="mt-2 flex gap-1">
+              {WEEKDAYS.map((name, d) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => toggleWeekday(d)}
+                  className={`flex-1 rounded-md py-1 text-xs transition ${
+                    recurrence.days.includes(d)
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 text-slate-500 dark:bg-slate-800'
+                  }`}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
+          {recurrence && (
+            <p className="mt-1 text-xs text-slate-400">
+              Когда вы закроете задачу, появится следующая с новым сроком.
+            </p>
+          )}
         </div>
 
         <div>

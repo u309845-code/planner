@@ -21,6 +21,13 @@ export function byDue(a: Task, b: Task): number {
   return a.dueAt.localeCompare(b.dueAt)
 }
 
+/** Полночь дня, в который попадает `ms` */
+export function dayStartMs(ms: number): number {
+  const d = new Date(ms)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
 export function endOfDay(ms: number): number {
   const d = new Date(ms)
   d.setHours(23, 59, 59, 999)
