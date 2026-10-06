@@ -54,17 +54,21 @@ export default function Sidebar({
       <div className="flex items-center justify-between gap-2">
         <h1 className="px-2 text-xl font-bold tracking-tight">Планер</h1>
 
-        <div className="relative lg:hidden">
-          <ProfileButton email={email} onClick={() => setMenuOpen(!menuOpen)} />
-          {menuOpen && (
-            <ProfileMenu
-              email={email}
-              theme={theme}
-              onTheme={onTheme}
-              onSignOut={onSignOut}
-              className="right-0 top-full mt-1"
-            />
-          )}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onTheme}
+            aria-label={theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'}
+            title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+          <div className="relative lg:hidden">
+            <ProfileButton email={email} onClick={() => setMenuOpen(!menuOpen)} />
+            {menuOpen && (
+              <ProfileMenu email={email} onSignOut={onSignOut} className="right-0 top-full mt-1" />
+            )}
+          </div>
         </div>
       </div>
 
@@ -146,13 +150,7 @@ export default function Sidebar({
           <span className="min-w-0 flex-1 truncate">{email}</span>
         </button>
         {menuOpen && (
-          <ProfileMenu
-            email={email}
-            theme={theme}
-            onTheme={onTheme}
-            onSignOut={onSignOut}
-            className="bottom-full left-0 mb-1 w-full"
-          />
+          <ProfileMenu email={email} onSignOut={onSignOut} className="bottom-full left-0 mb-1 w-full" />
         )}
       </div>
     </aside>
@@ -173,14 +171,10 @@ function ProfileButton({ email, onClick }: { email: string; onClick: () => void 
 
 function ProfileMenu({
   email,
-  theme,
-  onTheme,
   onSignOut,
   className,
 }: {
   email: string
-  theme: 'light' | 'dark'
-  onTheme: () => void
   onSignOut: () => void
   className: string
 }) {
@@ -191,10 +185,6 @@ function ProfileMenu({
       className={`absolute z-20 min-w-52 rounded-xl bg-white p-1 shadow-lg ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 ${className}`}
     >
       <p className="truncate px-2.5 py-1.5 text-xs text-slate-500">{email}</p>
-      <button onClick={onTheme} className={item}>
-        {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-        {theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
-      </button>
       <button onClick={onSignOut} className={item}>
         <LogOut size={15} /> Выйти
       </button>
