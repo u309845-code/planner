@@ -28,7 +28,7 @@ export default function Auth() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4">
-      <h1 className="mb-1 text-2xl font-bold tracking-tight">Планер</h1>
+      <h1 className="mb-1 text-2xl font-bold tracking-tight">Planner</h1>
       <p className="mb-6 text-sm text-slate-500">
         {mode === 'in' ? 'Войдите, чтобы увидеть свои задачи' : 'Создайте аккаунт'}
       </p>

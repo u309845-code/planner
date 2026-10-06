@@ -79,7 +79,7 @@ function Planner({ email }: { email: string }) {
   useEffect(() => {
     document.title = running
       ? `▶ ${formatClock(totalSpentSec(running, now))} · ${running.title}`
-      : 'Планер'
+      : 'Planner'
   }, [running, now])
 
   const data = useMemo(() => {

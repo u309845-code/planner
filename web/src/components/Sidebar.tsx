@@ -52,7 +52,7 @@ export default function Sidebar({
   return (
     <aside className="flex flex-col gap-4 lg:sticky lg:top-0 lg:h-dvh lg:py-6">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="px-2 text-xl font-bold tracking-tight">Планер</h1>
+        <h1 className="px-2 text-xl font-bold tracking-tight">Planner</h1>
 
         <div className="flex items-center gap-1">
           <button

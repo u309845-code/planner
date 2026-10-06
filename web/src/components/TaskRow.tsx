@@ -106,7 +106,9 @@ export default function TaskRow({ task, now, onToggle, onEdit, onStart, onPause,
               )}
             </span>
             {/* две колонки фиксированной ширины, чтобы срок и время стояли ровно */}
-            <span className={`sm:w-40 sm:text-right ${DUE_TEXT[bucket === 'none' ? 'later' : bucket]}`}>
+            <span
+              className={`whitespace-nowrap sm:w-48 sm:text-right ${DUE_TEXT[bucket === 'none' ? 'later' : bucket]}`}
+            >
               {isTask && task.dueAt && (
                 <>
                   {overdue ? 'просрочено · ' : ''}
@@ -115,7 +117,7 @@ export default function TaskRow({ task, now, onToggle, onEdit, onStart, onPause,
               )}
             </span>
             <span
-              className={`sm:w-32 sm:text-right ${
+              className={`whitespace-nowrap sm:w-40 sm:text-right ${
                 spentSec > 0 ? 'font-medium text-slate-700 dark:text-slate-200' : 'text-slate-400'
               }`}
               title="Затрачено времени"
@@ -179,7 +181,7 @@ export default function TaskRow({ task, now, onToggle, onEdit, onStart, onPause,
         )}
       </div>
 
-      {isTask && !task.done && (
+      {isTask && !task.done ? (
         <button
           onClick={() => (running ? onPause(task.id) : onStart(task.id))}
           aria-label={running ? 'Поставить таймер на паузу' : 'Запустить таймер'}
@@ -191,6 +193,9 @@ export default function TaskRow({ task, now, onToggle, onEdit, onStart, onPause,
         >
           {running ? <Pause size={16} /> : <Play size={16} />}
         </button>
+      ) : (
+        // то же место, что у кнопки таймера, чтобы колонки справа не съезжали
+        <span className="mt-0.5 size-7 shrink-0" />
       )}
     </li>
   )
