@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bell,
   CalendarCheck,
   CalendarRange,
   ChevronDown,
@@ -24,6 +25,7 @@ interface Props {
   email: string
   theme: 'light' | 'dark'
   onTheme: () => void
+  onNotifications: () => void
   onSignOut: () => void
 }
 
@@ -44,6 +46,7 @@ export default function Sidebar({
   email,
   theme,
   onTheme,
+  onNotifications,
   onSignOut,
 }: Props) {
   const [tagsOpen, setTagsOpen] = useState(false)
@@ -66,7 +69,15 @@ export default function Sidebar({
           <div className="relative lg:hidden">
             <ProfileButton email={email} onClick={() => setMenuOpen(!menuOpen)} />
             {menuOpen && (
-              <ProfileMenu email={email} onSignOut={onSignOut} className="right-0 top-full mt-1" />
+              <ProfileMenu
+                email={email}
+                onNotifications={() => {
+                  setMenuOpen(false)
+                  onNotifications()
+                }}
+                onSignOut={onSignOut}
+                className="right-0 top-full mt-1"
+              />
             )}
           </div>
         </div>
@@ -150,7 +161,15 @@ export default function Sidebar({
           <span className="min-w-0 flex-1 truncate">{email}</span>
         </button>
         {menuOpen && (
-          <ProfileMenu email={email} onSignOut={onSignOut} className="bottom-full left-0 mb-1 w-full" />
+          <ProfileMenu
+            email={email}
+            onNotifications={() => {
+              setMenuOpen(false)
+              onNotifications()
+            }}
+            onSignOut={onSignOut}
+            className="bottom-full left-0 mb-1 w-full"
+          />
         )}
       </div>
     </aside>
@@ -171,10 +190,12 @@ function ProfileButton({ email, onClick }: { email: string; onClick: () => void 
 
 function ProfileMenu({
   email,
+  onNotifications,
   onSignOut,
   className,
 }: {
   email: string
+  onNotifications: () => void
   onSignOut: () => void
   className: string
 }) {
@@ -185,6 +206,9 @@ function ProfileMenu({
       className={`absolute z-20 min-w-52 rounded-xl bg-white p-1 shadow-lg ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700 ${className}`}
     >
       <p className="truncate px-2.5 py-1.5 text-xs text-slate-500">{email}</p>
+      <button onClick={onNotifications} className={item}>
+        <Bell size={15} /> Уведомления
+      </button>
       <button onClick={onSignOut} className={item}>
         <LogOut size={15} /> Выйти
       </button>

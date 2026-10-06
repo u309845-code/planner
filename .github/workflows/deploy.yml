@@ -24,6 +24,7 @@ jobs:
       # Публичные значения (publishable-ключ Supabase не секретен, доступ защищён RLS)
       VITE_SUPABASE_URL: https://jnxrrlwvqhfacdqqeipl.supabase.co
       VITE_SUPABASE_ANON_KEY: sb_publishable_shSDRDc1RS9WuQX3EOdIKA_YdM_i6SA
+      VITE_VAPID_PUBLIC_KEY: BPvOkKtSp3Ky23jMJfkCro-cLbt25f4tawf72ZwRk_XEGDKSb7x1eUCtNrVWhF1e6YY6bqgahMldZx8-akNduhw
       VITE_BASE: /${{ github.event.repository.name }}/
     steps:
       - uses: actions/checkout@v4
