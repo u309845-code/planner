@@ -3,7 +3,6 @@ import type { Session } from '@supabase/supabase-js'
 import { Plus } from 'lucide-react'
 import Auth from './Auth'
 import MonthView from './components/MonthView'
-import NotificationsDialog from './components/NotificationsDialog'
 import NotesView from './components/NotesView'
 import ReportsView from './components/ReportsView'
 import RunningBar from './components/RunningBar'
@@ -73,7 +72,6 @@ function Planner({ email }: { email: string }) {
   // не null — открыта форма новой задачи с этими значениями по умолчанию
   const [creating, setCreating] = useState<Partial<TaskForm> | null>(null)
   const [quickText, setQuickText] = useState('')
-  const [notifOpen, setNotifOpen] = useState(false)
 
   const editing = dialog ? tasks.find((t) => t.id === dialog) : undefined
 
@@ -147,7 +145,6 @@ function Planner({ email }: { email: string }) {
         email={email}
         theme={theme}
         onTheme={toggleTheme}
-        onNotifications={() => setNotifOpen(true)}
         onSignOut={() => void supabase.auth.signOut()}
       />
 
@@ -337,8 +334,6 @@ function Planner({ email }: { email: string }) {
       {running && (
         <RunningBar task={running} now={now} onPause={pauseTimer} onFinish={finishTask} />
       )}
-
-      {notifOpen && <NotificationsDialog onClose={() => setNotifOpen(false)} />}
 
       {creating && (
         <TaskDialog
