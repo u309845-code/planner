@@ -5,7 +5,7 @@ export const DAY = 24 * HOUR
 
 export type Bucket = 'hot' | 'soon' | 'later' | 'none'
 
-/** Горит — до дедлайна ≤ 1 дня (включая просроченные); Скоро — ≤ 3 дней. */
+/** hot — до дедлайна ≤ 1 дня (включая просроченные); soon — ≤ 3 дней. */
 export function bucketOf(t: Task, now: number): Bucket {
   if (t.done || t.kind !== 'task' || !t.dueAt) return 'none'
   const diff = new Date(t.dueAt).getTime() - now

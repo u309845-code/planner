@@ -110,10 +110,10 @@ export default function WeekView({
         )}
         <p className="ml-auto flex shrink-0 items-center gap-3 text-xs text-slate-500">
           <span className="flex items-center gap-1">
-            <span className="size-2.5 rounded-sm bg-red-400" /> горит
+            <span className="size-2.5 rounded-sm bg-red-400" /> срок до 1 дня
           </span>
           <span className="flex items-center gap-1">
-            <span className="size-2.5 rounded-sm bg-amber-400" /> скоро
+            <span className="size-2.5 rounded-sm bg-amber-400" /> до 3 дней
           </span>
         </p>
       </div>

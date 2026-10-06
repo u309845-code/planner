@@ -1,4 +1,4 @@
-import { Plus, X } from 'lucide-react'
+import { ChevronDown, Plus, X } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { formatDayLabel, formatSpent, isoToLocalInput, localInputToIso } from '../dates'
 import { TAGS } from '../tags'
@@ -59,6 +59,16 @@ export default function TaskDialog({ task, defaults, days, now, onSubmit, onDele
   const [checklist, setChecklist] = useState<ChecklistItem[]>(init?.checklist ?? [])
   const [newItem, setNewItem] = useState('')
   const [recurrence, setRecurrence] = useState<Recurrence | null>(init?.recurrence ?? null)
+  // «Ещё» открыто сразу, если у задачи уже заполнены дополнительные поля
+  const [more, setMore] = useState(
+    !!task &&
+      (!!task.notes ||
+        task.checklist.length > 0 ||
+        task.plannedMin !== null ||
+        !!task.planDate ||
+        task.priority > 0 ||
+        !!task.recurrence),
+  )
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -85,8 +95,8 @@ export default function TaskDialog({ task, defaults, days, now, onSubmit, onDele
   function toggleWeekday(d: number) {
     setRecurrence((r) => {
       if (r?.freq !== 'weekly') return r
-      const days = r.days.includes(d) ? r.days.filter((x) => x !== d) : [...r.days, d]
-      return { freq: 'weekly', days: days.length ? days : r.days }
+      const next = r.days.includes(d) ? r.days.filter((x) => x !== d) : [...r.days, d]
+      return { freq: 'weekly', days: next.length ? next : r.days }
     })
   }
 
@@ -135,168 +145,16 @@ export default function TaskDialog({ task, defaults, days, now, onSubmit, onDele
           autoFocus
           className={field}
         />
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Описание"
-          rows={3}
-          className={`${field} resize-none`}
-        />
 
-        <div>
-          <p className="mb-1 text-xs text-slate-500">
-            Чеклист
-            {checklist.length > 0 &&
-              ` · ${checklist.filter((i) => i.done).length} из ${checklist.length}`}
-          </p>
-          <ul className="space-y-1">
-            {checklist.map((item) => (
-              <li key={item.id} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={item.done}
-                  onChange={() =>
-                    setChecklist((prev) =>
-                      prev.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)),
-                    )
-                  }
-                  aria-label="Пункт выполнен"
-                  className="size-4 shrink-0 accent-emerald-600"
-                />
-                <input
-                  value={item.text}
-                  onChange={(e) =>
-                    setChecklist((prev) =>
-                      prev.map((i) => (i.id === item.id ? { ...i, text: e.target.value } : i)),
-                    )
-                  }
-                  className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
-                    item.done ? 'text-slate-400 line-through' : ''
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setChecklist((prev) => prev.filter((i) => i.id !== item.id))}
-                  aria-label="Удалить пункт"
-                  className="rounded p-1 text-slate-400 hover:text-red-500"
-                >
-                  <X size={14} />
-                </button>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-1.5 flex items-center gap-2">
-            <input
-              value={newItem}
-              onChange={(e) => setNewItem(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  addItem()
-                }
-              }}
-              placeholder="Добавить пункт"
-              className={field}
-            />
-            <button
-              type="button"
-              onClick={addItem}
-              aria-label="Добавить пункт"
-              className="shrink-0 rounded-lg bg-slate-100 p-2 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700"
-            >
-              <Plus size={16} />
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <label className="space-y-1 text-xs text-slate-500">
-            Дедлайн
-            <input
-              type="datetime-local"
-              value={due}
-              onChange={(e) => setDue(e.target.value)}
-              className={field}
-            />
-          </label>
-          <label className="space-y-1 text-xs text-slate-500">
-            План, минут
-            <input
-              type="number"
-              min={0}
-              step={5}
-              value={plan}
-              onChange={(e) => setPlan(e.target.value)}
-              className={field}
-            />
-          </label>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <label className="space-y-1 text-xs text-slate-500">
-            День в плане
-            <input
-              type="date"
-              value={planDay}
-              onChange={(e) => setPlanDay(e.target.value)}
-              className={field}
-            />
-          </label>
-          <label className="space-y-1 text-xs text-slate-500">
-            Приоритет
-            <select
-              value={priority}
-              onChange={(e) => setPriority(Number(e.target.value) as Priority)}
-              className={field}
-            >
-              {PRIORITIES.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div>
-          <label className="block space-y-1 text-xs text-slate-500">
-            Повтор
-            <select
-              value={recurrence?.freq ?? ''}
-              onChange={(e) => setFreq(e.target.value)}
-              className={field}
-            >
-              {FREQS.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {recurrence?.freq === 'weekly' && (
-            <div className="mt-2 flex gap-1">
-              {WEEKDAYS.map((name, d) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => toggleWeekday(d)}
-                  className={`flex-1 rounded-md py-1 text-xs transition ${
-                    recurrence.days.includes(d)
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-100 text-slate-500 dark:bg-slate-800'
-                  }`}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          )}
-          {recurrence && (
-            <p className="mt-1 text-xs text-slate-400">
-              Когда вы закроете задачу, появится следующая с новым сроком.
-            </p>
-          )}
-        </div>
+        <label className="block space-y-1 text-xs text-slate-500">
+          Дедлайн
+          <input
+            type="datetime-local"
+            value={due}
+            onChange={(e) => setDue(e.target.value)}
+            className={field}
+          />
+        </label>
 
         <div>
           <p className="mb-1 text-xs text-slate-500">Теги</p>
@@ -333,6 +191,171 @@ export default function TaskDialog({ task, defaults, days, now, onSubmit, onDele
             ) : (
               <p className="mt-1 text-xs text-slate-500">Таймер по этой задаче ещё не запускали.</p>
             )}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setMore(!more)}
+          className="flex items-center gap-1 text-sm text-indigo-600 hover:underline dark:text-indigo-400"
+        >
+          {more ? 'Скрыть' : 'Ещё: описание, чеклист, повтор, план'}
+          <ChevronDown size={14} className={`transition ${more ? 'rotate-180' : ''}`} />
+        </button>
+
+        {more && (
+          <div className="space-y-3">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Описание"
+              rows={3}
+              className={`${field} resize-none`}
+            />
+
+            <div>
+              <p className="mb-1 text-xs text-slate-500">
+                Чеклист
+                {checklist.length > 0 &&
+                  ` · ${checklist.filter((i) => i.done).length} из ${checklist.length}`}
+              </p>
+              <ul className="space-y-1">
+                {checklist.map((item) => (
+                  <li key={item.id} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={item.done}
+                      onChange={() =>
+                        setChecklist((prev) =>
+                          prev.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)),
+                        )
+                      }
+                      aria-label="Пункт выполнен"
+                      className="size-4 shrink-0 accent-emerald-600"
+                    />
+                    <input
+                      value={item.text}
+                      onChange={(e) =>
+                        setChecklist((prev) =>
+                          prev.map((i) => (i.id === item.id ? { ...i, text: e.target.value } : i)),
+                        )
+                      }
+                      className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${
+                        item.done ? 'text-slate-400 line-through' : ''
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setChecklist((prev) => prev.filter((i) => i.id !== item.id))}
+                      aria-label="Удалить пункт"
+                      className="rounded p-1 text-slate-400 hover:text-red-500"
+                    >
+                      <X size={14} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-1.5 flex items-center gap-2">
+                <input
+                  value={newItem}
+                  onChange={(e) => setNewItem(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      addItem()
+                    }
+                  }}
+                  placeholder="Добавить пункт"
+                  className={field}
+                />
+                <button
+                  type="button"
+                  onClick={addItem}
+                  aria-label="Добавить пункт"
+                  className="shrink-0 rounded-lg bg-slate-100 p-2 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className="space-y-1 text-xs text-slate-500">
+                План, минут
+                <input
+                  type="number"
+                  min={0}
+                  step={5}
+                  value={plan}
+                  onChange={(e) => setPlan(e.target.value)}
+                  className={field}
+                />
+              </label>
+              <label className="space-y-1 text-xs text-slate-500">
+                День в плане
+                <input
+                  type="date"
+                  value={planDay}
+                  onChange={(e) => setPlanDay(e.target.value)}
+                  className={field}
+                />
+              </label>
+            </div>
+
+            <label className="block space-y-1 text-xs text-slate-500">
+              Приоритет
+              <select
+                value={priority}
+                onChange={(e) => setPriority(Number(e.target.value) as Priority)}
+                className={field}
+              >
+                {PRIORITIES.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div>
+              <label className="block space-y-1 text-xs text-slate-500">
+                Повтор
+                <select
+                  value={recurrence?.freq ?? ''}
+                  onChange={(e) => setFreq(e.target.value)}
+                  className={field}
+                >
+                  {FREQS.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {recurrence?.freq === 'weekly' && (
+                <div className="mt-2 flex gap-1">
+                  {WEEKDAYS.map((name, d) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => toggleWeekday(d)}
+                      className={`flex-1 rounded-md py-1 text-xs transition ${
+                        recurrence.days.includes(d)
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-100 text-slate-500 dark:bg-slate-800'
+                      }`}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {recurrence && (
+                <p className="mt-1 text-xs text-slate-400">
+                  Когда вы закроете задачу, появится следующая с новым сроком.
+                </p>
+              )}
+            </div>
           </div>
         )}
 

@@ -18,8 +18,8 @@ interface Props {
 }
 
 const COLS: { id: Col; title: string; style: string }[] = [
-  { id: 'hot', title: 'Горит · до 1 дня', style: 'text-red-600 dark:text-red-400' },
-  { id: 'soon', title: 'Скоро · до 3 дней', style: 'text-amber-600 dark:text-amber-400' },
+  { id: 'hot', title: 'До 1 дня', style: 'text-red-600 dark:text-red-400' },
+  { id: 'soon', title: 'До 3 дней', style: 'text-amber-600 dark:text-amber-400' },
   { id: 'later', title: 'Позже', style: 'text-slate-700 dark:text-slate-200' },
   { id: 'nodate', title: 'Без срока', style: 'text-slate-700 dark:text-slate-200' },
 ]
@@ -214,8 +214,8 @@ export default function TasksBoard({ tasks, now, onEdit, onToggle, onSetDue, onQ
       </div>
 
       <p className="mt-3 text-xs text-slate-400">
-        Перетащите карточку в другую колонку, чтобы изменить дедлайн: «Горит» — сегодня, «Скоро» — через 2 дня,
-        «Позже» — через неделю, «Без срока» — убрать.
+        Перетащите карточку в другую колонку, чтобы изменить дедлайн: «До 1 дня» — сегодня, «До 3 дней» —
+        через 2 дня, «Позже» — через неделю, «Без срока» — убрать.
       </p>
 
       {undo && (

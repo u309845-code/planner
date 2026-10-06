@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { Clock, Flame, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import Auth from './Auth'
 import MonthView from './components/MonthView'
 import NotesView from './components/NotesView'
@@ -18,7 +18,6 @@ import {
   byDue,
   endOfDay,
   formatClock,
-  formatDue,
   formatSpent,
   isSameDay,
   toDateKey,
@@ -43,13 +42,6 @@ export default function App() {
   if (session === undefined) return null
   if (session === null) return <Auth />
   return <Planner email={session.user.email ?? ''} />
-}
-
-/** Срок по умолчанию для новой задачи на «Сегодня»: сегодня к 18:00 (но не раньше, чем через час). */
-function defaultDueToday(now: number): string {
-  const d = new Date(now)
-  d.setHours(18, 0, 0, 0)
-  return new Date(Math.min(Math.max(d.getTime(), now + 3_600_000), endOfDay(now))).toISOString()
 }
 
 function Planner({ email }: { email: string }) {
@@ -79,6 +71,7 @@ function Planner({ email }: { email: string }) {
   const [dialog, setDialog] = useState<string | null>(null)
   // не null — открыта форма новой задачи с этими значениями по умолчанию
   const [creating, setCreating] = useState<Partial<TaskForm> | null>(null)
+  const [quickText, setQuickText] = useState('')
 
   const editing = dialog ? tasks.find((t) => t.id === dialog) : undefined
 
@@ -164,44 +157,65 @@ function Planner({ email }: { email: string }) {
 
         {view === 'today' && (
           <>
-            <button
-              onClick={() => setCreating({ dueAt: defaultDueToday(now), tags: tagFilter })}
-              className="mb-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500"
-            >
-              <Plus size={16} /> Новая задача
-            </button>
+            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h2 className="text-xl font-semibold">Сегодня</h2>
+              <p className="text-sm text-slate-500">
+                {totalToday > 0 && `сделано ${data.todayDone} из ${totalToday}`}
+                {totalToday > 0 && todaySec > 0 && ' · '}
+                {todaySec > 0 && (
+                  <span className="font-medium text-slate-700 dark:text-slate-200">
+                    записано {formatSpent(todaySec)}
+                  </span>
+                )}
+              </p>
+            </div>
 
-            {(data.hot.length > 0 || data.soon.length > 0) && (
-              <div className="mb-5 grid gap-3 sm:grid-cols-2">
-                <DeadlineCard
-                  title="Горит · до 1 дня"
-                  icon={<Flame size={15} />}
-                  tone="hot"
-                  items={data.hot}
-                  now={now}
-                  onOpen={() => setView('tasks')}
-                  onEdit={setDialog}
-                />
-                <DeadlineCard
-                  title="Скоро · до 3 дней"
-                  icon={<Clock size={15} />}
-                  tone="soon"
-                  items={data.soon}
-                  now={now}
-                  onOpen={() => setView('tasks')}
-                  onEdit={setDialog}
-                />
+            {(data.counts.hot > 0 || data.counts.soon > 0) && (
+              <div className="mb-3 flex flex-wrap gap-2 text-sm">
+                {data.counts.hot > 0 && (
+                  <button
+                    onClick={() => setView('tasks')}
+                    className="rounded-full bg-red-50 px-3 py-1 text-red-700 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300"
+                  >
+                    Срок до 1 дня · {data.counts.hot}
+                  </button>
+                )}
+                {data.counts.soon > 0 && (
+                  <button
+                    onClick={() => setView('tasks')}
+                    className="rounded-full bg-amber-50 px-3 py-1 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300"
+                  >
+                    Срок до 3 дней · {data.counts.soon}
+                  </button>
+                )}
               </div>
             )}
 
-            <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3">
-              <h2 className="text-lg font-semibold">Фокус на сегодня</h2>
-              <span className="text-sm text-slate-500">
-                {totalToday > 0 && `сделано ${data.todayDone} из ${totalToday}`}
-                {totalToday > 0 && todaySec > 0 && ' · '}
-                {todaySec > 0 && `записано ${formatSpent(todaySec)}`}
-              </span>
-            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const title = quickText.trim()
+                if (!title) return
+                void add({ title, kind: 'task', planDate: toDateKey(now), tags: tagFilter })
+                setQuickText('')
+              }}
+              className="mb-3 flex items-center gap-2 rounded-2xl bg-white p-1.5 pl-3 ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-indigo-500/50 dark:bg-slate-900 dark:ring-slate-800"
+            >
+              <Plus size={17} className="shrink-0 text-slate-400" />
+              <input
+                value={quickText}
+                onChange={(e) => setQuickText(e.target.value)}
+                placeholder="Добавить задачу на сегодня"
+                className="min-w-0 flex-1 bg-transparent py-1.5 text-base outline-none placeholder:text-slate-400"
+              />
+              <button
+                type="button"
+                onClick={() => setCreating({ planDate: toDateKey(now), tags: tagFilter })}
+                className="shrink-0 rounded-lg px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                Подробнее
+              </button>
+            </form>
             {totalToday > 0 && (
               <div className="mb-2 h-1.5 rounded-full bg-slate-200 dark:bg-slate-800">
                 <div
@@ -339,51 +353,6 @@ function Planner({ email }: { email: string }) {
           onDelete={(id) => void remove(id)}
           onClose={() => setDialog(null)}
         />
-      )}
-    </div>
-  )
-}
-
-function DeadlineCard({
-  title,
-  icon,
-  tone,
-  items,
-  now,
-  onOpen,
-  onEdit,
-}: {
-  title: string
-  icon: React.ReactNode
-  tone: 'hot' | 'soon'
-  items: Task[]
-  now: number
-  onOpen: () => void
-  onEdit: (id: string) => void
-}) {
-  const style =
-    tone === 'hot'
-      ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300'
-      : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300'
-  return (
-    <div className={`rounded-2xl border p-3 ${style}`}>
-      <button onClick={onOpen} className="mb-1 flex items-center gap-1.5 text-sm font-medium">
-        {icon} {title}
-        <span className="ml-1 text-xs opacity-70">{items.length}</span>
-      </button>
-      {items.length === 0 ? (
-        <p className="py-1 text-sm opacity-70">Пусто</p>
-      ) : (
-        items.slice(0, 3).map((t) => (
-          <button
-            key={t.id}
-            onClick={() => onEdit(t.id)}
-            className="flex w-full items-center gap-2 border-t border-current/15 py-1.5 text-left text-sm first:border-t-0"
-          >
-            <span className="flex-1 truncate text-slate-900 dark:text-slate-100">{t.title}</span>
-            <span className="shrink-0 text-xs">{t.dueAt && formatDue(t.dueAt, now)}</span>
-          </button>
-        ))
       )}
     </div>
   )

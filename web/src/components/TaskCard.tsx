@@ -1,6 +1,14 @@
-import { Flag, ListChecks, Repeat } from 'lucide-react'
+import { Flag, ListChecks, Repeat, Timer } from 'lucide-react'
 import type { DragEvent } from 'react'
-import { bucketOf, formatDue, formatMinutes, fromDateKey, dayStartMs } from '../dates'
+import {
+  bucketOf,
+  dayStartMs,
+  formatDue,
+  formatMinutes,
+  formatSpent,
+  fromDateKey,
+  totalSpentSec,
+} from '../dates'
 import { tagById } from '../tags'
 import type { Task } from '../types'
 
@@ -33,6 +41,7 @@ export default function TaskCard({
         : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'
   const planPassed = t.planDate && !t.done && fromDateKey(t.planDate) < dayStartMs(now)
   const doneItems = t.checklist.filter((i) => i.done).length
+  const spentSec = totalSpentSec(t, now)
 
   return (
     <div
@@ -54,10 +63,7 @@ export default function TaskCard({
         <button onClick={() => onEdit(t.id)} className="min-w-0 flex-1 text-left">
           <span className={`block break-words leading-snug ${t.done ? 'line-through' : ''}`}>
             {t.priority > 0 && !t.done && (
-              <Flag
-                size={12}
-                className={`mr-1 inline -translate-y-px ${t.priority === 2 ? 'text-red-500' : 'text-amber-500'}`}
-              />
+              <Flag size={12} className="mr-1 inline -translate-y-px text-slate-500" />
             )}
             {t.title}
           </span>
@@ -68,8 +74,27 @@ export default function TaskCard({
           const tag = tagById(id)
           return tag ? <span key={id} className={`size-2 rounded-full ${tag.dot}`} title={tag.label} /> : null
         })}
-        {t.dueAt && !t.done && <span>{formatDue(t.dueAt, now)}</span>}
-        {t.plannedMin !== null && <span>· {formatMinutes(t.plannedMin)}</span>}
+        {t.dueAt && !t.done && (
+          <span
+            className={
+              bucket === 'hot'
+                ? 'text-red-600 dark:text-red-400'
+                : bucket === 'soon'
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : ''
+            }
+          >
+            {formatDue(t.dueAt, now)}
+          </span>
+        )}
+        {spentSec > 0 ? (
+          <span className="inline-flex items-center gap-0.5 font-medium text-slate-700 dark:text-slate-200">
+            <Timer size={11} /> {formatSpent(spentSec)}
+            {t.plannedMin !== null && ` / ${formatMinutes(t.plannedMin)}`}
+          </span>
+        ) : (
+          t.plannedMin !== null && <span>план {formatMinutes(t.plannedMin)}</span>
+        )}
         {t.checklist.length > 0 && (
           <span className="inline-flex items-center gap-0.5">
             <ListChecks size={11} /> {doneItems}/{t.checklist.length}
