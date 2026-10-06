@@ -97,33 +97,38 @@ export default function TaskRow({ task, now, onToggle, onEdit, onStart, onPause,
             })}
           </span>
 
-          <span className="flex shrink-0 items-center gap-3 text-xs">
-            {task.recurrence && (
-              <span title={describeRecurrence(task.recurrence)} className="text-slate-400">
-                <Repeat size={13} />
-              </span>
-            )}
-            {isTask && task.dueAt && (
-              <span className={DUE_TEXT[bucket === 'none' ? 'later' : bucket]}>
-                {overdue ? 'просрочено · ' : ''}
-                {formatDue(task.dueAt, now)}
-              </span>
-            )}
-            {isTask && (spentSec > 0 || task.plannedMin !== null) && (
-              <span
-                className={`inline-flex items-center gap-1 ${
-                  spentSec > 0
-                    ? 'font-medium text-slate-700 dark:text-slate-200'
-                    : 'text-slate-400'
-                }`}
-                title="Затрачено времени"
-              >
-                <Timer size={13} />
-                {spentSec > 0
-                  ? `${formatSpent(spentSec)}${task.plannedMin !== null ? ` / ${formatMinutes(task.plannedMin)}` : ''}`
-                  : `план ${formatMinutes(task.plannedMin ?? 0)}`}
-              </span>
-            )}
+          <span className="flex shrink-0 items-baseline gap-3 text-xs">
+            <span className="w-4 text-slate-400">
+              {task.recurrence && (
+                <span title={describeRecurrence(task.recurrence)}>
+                  <Repeat size={13} />
+                </span>
+              )}
+            </span>
+            {/* две колонки фиксированной ширины, чтобы срок и время стояли ровно */}
+            <span className={`sm:w-40 sm:text-right ${DUE_TEXT[bucket === 'none' ? 'later' : bucket]}`}>
+              {isTask && task.dueAt && (
+                <>
+                  {overdue ? 'просрочено · ' : ''}
+                  {formatDue(task.dueAt, now)}
+                </>
+              )}
+            </span>
+            <span
+              className={`sm:w-32 sm:text-right ${
+                spentSec > 0 ? 'font-medium text-slate-700 dark:text-slate-200' : 'text-slate-400'
+              }`}
+              title="Затрачено времени"
+            >
+              {isTask && (spentSec > 0 || task.plannedMin !== null) && (
+                <span className="inline-flex items-center justify-end gap-1">
+                  <Timer size={13} />
+                  {spentSec > 0
+                    ? `${formatSpent(spentSec)}${task.plannedMin !== null ? ` / ${formatMinutes(task.plannedMin)}` : ''}`
+                    : `план ${formatMinutes(task.plannedMin ?? 0)}`}
+                </span>
+              )}
+            </span>
           </span>
         </button>
 
